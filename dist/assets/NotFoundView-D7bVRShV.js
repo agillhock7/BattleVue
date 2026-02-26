@@ -1,1 +1,0 @@
-import{_ as s,o as t,c as n,a as o}from"./index-DT-kPDxK.js";const c={},a={class:"panel col"};function r(d,e){return t(),n("section",a,[...e[0]||(e[0]=[o("h2",null,"Not Found",-1),o("p",{class:"muted"},"The requested page does not exist.",-1)])])}const _=s(c,[["render",r]]);export{_ as default};

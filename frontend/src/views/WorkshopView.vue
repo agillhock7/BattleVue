@@ -92,7 +92,14 @@
     </aside>
 
     <article class="col workshop-main">
-      <div class="panel col">
+      <BotBuildPreview
+        :blueprint="blueprintDraft"
+        :ruleset="rulesetDraft"
+        :blueprint-validation="blueprintValidation"
+        :ruleset-validation="rulesetValidation"
+      />
+
+      <div class="panel col workshop-control">
         <div class="row" style="justify-content: space-between; align-items: center;">
           <h3 style="margin: 0;">Quick Build Assistant</h3>
           <button class="ghost" @click="resetDrafts">Reset Drafts</button>
@@ -153,6 +160,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import BotBuildPreview from '@/components/BotBuildPreview.vue';
 import BlueprintBuilder from '@/components/BlueprintBuilder.vue';
 import RuleBuilder from '@/components/RuleBuilder.vue';
 import { api } from '@/services/api';
@@ -580,6 +588,12 @@ function setStatus(message: string, isError: boolean) {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.workshop-control {
+  background:
+    radial-gradient(circle at 12% 15%, rgba(56, 189, 248, 0.12), transparent 40%),
+    rgba(16, 29, 52, 0.92);
 }
 
 .progress-item {
