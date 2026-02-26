@@ -2,23 +2,25 @@
   <section class="panel col" style="max-width: 500px; margin: 24px auto;">
     <h2>Register</h2>
     <div class="oauth-row">
-      <a class="oauth-btn discord" href="/api/auth/oauth/discord/start">Sign up with Discord</a>
-      <a class="oauth-btn github" href="/api/auth/oauth/github/start">Sign up with GitHub</a>
+      <button class="oauth-btn discord" type="button" @click="startOAuth('discord')">Sign up with Discord</button>
+      <button class="oauth-btn github" type="button" @click="startOAuth('github')">Sign up with GitHub</button>
     </div>
     <p class="muted" style="margin: 0;">or create an account with email</p>
-    <label>
-      Username
-      <input v-model="username" autocomplete="username" />
-    </label>
-    <label>
-      Email
-      <input v-model="email" type="email" autocomplete="email" />
-    </label>
-    <label>
-      Password
-      <input v-model="password" type="password" autocomplete="new-password" />
-    </label>
-    <button @click="submit" :disabled="loading">{{ loading ? 'Creating...' : 'Create Account' }}</button>
+    <form class="col" @submit.prevent="submit">
+      <label>
+        Username
+        <input v-model="username" autocomplete="username" />
+      </label>
+      <label>
+        Email
+        <input v-model="email" type="email" autocomplete="email" />
+      </label>
+      <label>
+        Password
+        <input v-model="password" type="password" autocomplete="new-password" />
+      </label>
+      <button type="submit" :disabled="loading">{{ loading ? 'Creating...' : 'Create Account' }}</button>
+    </form>
     <p class="muted">Already registered? <RouterLink to="/login">Login</RouterLink></p>
     <p v-if="error" style="color: #fca5a5">{{ error }}</p>
   </section>
@@ -28,6 +30,7 @@
 import { ref } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
+import { api } from '@/services/api';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -50,6 +53,15 @@ async function submit() {
     loading.value = false;
   }
 }
+
+async function startOAuth(provider: 'discord' | 'github') {
+  try {
+    const data = await api.get<{ auth_url: string }>(`/auth/oauth/${provider}/url`);
+    window.location.assign(data.auth_url);
+  } catch (e: any) {
+    error.value = e?.message || `Could not start ${provider} OAuth`;
+  }
+}
 </script>
 
 <style scoped>
@@ -66,6 +78,7 @@ async function submit() {
   padding: 10px 12px;
   font-weight: 700;
   color: #fff;
+  border: 0;
 }
 
 .oauth-btn.discord {

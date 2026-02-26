@@ -207,6 +207,14 @@ try {
         }
     }
 
+    if (matchRoute($method, $path, 'GET', '#^/auth/oauth/(discord|github)/url$#', $params)) {
+        $provider = (string) $params[1];
+        Response::ok([
+            'provider' => $provider,
+            'auth_url' => $oauthService->authorizationUrl($provider),
+        ]);
+    }
+
     if (matchRoute($method, $path, 'GET', '#^/auth/oauth/(discord|github)/callback$#', $params)) {
         $provider = (string) $params[1];
         $code = trim((string) ($_GET['code'] ?? ''));
