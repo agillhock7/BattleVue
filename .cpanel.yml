@@ -20,5 +20,20 @@ deployment:
       fi
     - |
       if [ -f "$APIDIR/config/config.php" ]; then
-        php "$APIDIR/scripts/migrate.php"
+        php "$APIDIR/scripts/migrate.php" >/tmp/battlevue_migrate.log 2>&1 &
+        MIGRATE_PID=$!
+        MAX_WAIT=60
+        ELAPSED=0
+        while kill -0 "$MIGRATE_PID" >/dev/null 2>&1; do
+          if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
+            kill -TERM "$MIGRATE_PID" >/dev/null 2>&1 || true
+            sleep 1
+            kill -KILL "$MIGRATE_PID" >/dev/null 2>&1 || true
+            echo "Migration timed out after ${MAX_WAIT}s; continuing deploy."
+            break
+          fi
+          sleep 1
+          ELAPSED=$((ELAPSED + 1))
+        done
+        wait "$MIGRATE_PID" >/dev/null 2>&1 || true
       fi
