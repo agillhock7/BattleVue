@@ -11,6 +11,7 @@ deployment:
         find "$DOCROOT" -mindepth 1 -maxdepth 1 ! -name '.htaccess' ! -name 'api' -exec rm -rf {} +
         cp -R dist/. "$DOCROOT/"
       fi
+    - cp .htaccess "$DOCROOT/.htaccess"
     - |
       if command -v rsync >/dev/null 2>&1; then
         rsync -a --delete --exclude='config.php' api/ "$APIDIR/"
