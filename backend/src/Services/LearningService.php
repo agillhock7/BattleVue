@@ -79,10 +79,19 @@ class LearningService
         $suggestedPrompts = $this->normalizeSuggestedPrompts($session, $starterPrompts, count($messages));
 
         $nextTier = max(1, ((int) $session['last_checkpoint_tier']) + 1);
+        $previousTarget = $nextTier > 1 ? $this->tokenTargetForTier($nextTier - 1) : 0;
         $nextTarget = $this->tokenTargetForTier($nextTier);
-        $remaining = max(0, $nextTarget - (int) $session['cumulative_total_tokens']);
+        $cumulativeUserTokens = (int) $session['cumulative_user_tokens'];
+        $cumulativeTotalTokens = (int) $session['cumulative_total_tokens'];
+        $remaining = max(0, $nextTarget - $cumulativeUserTokens);
+        $tierSpan = max(1, $nextTarget - $previousTarget);
+        $tierProgressTokens = max(0, $cumulativeUserTokens - $previousTarget);
+        $tierProgressPercent = (int) floor(min(1, $tierProgressTokens / $tierSpan) * 100);
         $sessionMax = $this->configInt('LEARN_SESSION_MAX_TOTAL_TOKENS', 9000);
-        $toSessionCompletion = max(0, $sessionMax - (int) $session['cumulative_total_tokens']);
+        $toSessionCompletion = max(0, $sessionMax - $cumulativeTotalTokens);
+        $sessionProgressPercent = (int) floor(min(1, $cumulativeTotalTokens / max(1, $sessionMax)) * 100);
+        $minUserTurns = max(1, $this->configInt('LEARN_CHECKPOINT_MIN_USER_TURNS', 3));
+        $userTurnsSinceCheckpoint = $this->repo->countUserMessagesSinceLastCheckpoint($sessionId);
 
         return [
             'session' => [
@@ -96,15 +105,24 @@ class LearningService
                 'status' => $session['status'],
                 'completion_reason' => $session['completion_reason'] ?? null,
                 'completed_at' => $session['completed_at'] ?? null,
-                'cumulative_user_tokens' => (int) $session['cumulative_user_tokens'],
+                'cumulative_user_tokens' => $cumulativeUserTokens,
                 'cumulative_model_tokens' => (int) $session['cumulative_model_tokens'],
-                'cumulative_total_tokens' => (int) $session['cumulative_total_tokens'],
+                'cumulative_total_tokens' => $cumulativeTotalTokens,
                 'last_checkpoint_tier' => (int) $session['last_checkpoint_tier'],
                 'next_checkpoint_tier' => $nextTier,
+                'previous_checkpoint_token_target' => $previousTarget,
                 'next_checkpoint_token_target' => $nextTarget,
+                'next_checkpoint_metric' => 'user_tokens',
                 'tokens_to_next_checkpoint' => $remaining,
+                'tier_progress_user_tokens' => $tierProgressTokens,
+                'tier_progress_target_tokens' => $tierSpan,
+                'tier_progress_percent' => $tierProgressPercent,
+                'checkpoint_min_user_turns' => $minUserTurns,
+                'user_turns_since_last_checkpoint' => $userTurnsSinceCheckpoint,
+                'turns_to_next_checkpoint' => max(0, $minUserTurns - $userTurnsSinceCheckpoint),
                 'session_max_total_tokens' => $sessionMax,
                 'tokens_to_session_completion' => $toSessionCompletion,
+                'session_progress_percent' => $sessionProgressPercent,
                 'bot_points' => $botPoints,
             ],
             'messages' => $messages,
@@ -176,7 +194,9 @@ class LearningService
         if (!$checkpoint) {
             $nextTier = max(1, ((int) $updatedSession['last_checkpoint_tier']) + 1);
             $target = $this->tokenTargetForTier($nextTier);
-            if ((int) $updatedSession['cumulative_total_tokens'] >= $target) {
+            $minTurns = max(1, $this->configInt('LEARN_CHECKPOINT_MIN_USER_TURNS', 3));
+            $turnsSinceCheckpoint = $this->repo->countUserMessagesSinceLastCheckpoint($sessionId);
+            if ((int) $updatedSession['cumulative_user_tokens'] >= $target && $turnsSinceCheckpoint >= $minTurns) {
                 $quiz = $this->aiTutorService->generateCheckpointQuiz(
                     (string) $updatedSession['topic_title'],
                     (string) $updatedSession['system_prompt'],
@@ -280,8 +300,8 @@ class LearningService
 
     private function tokenTargetForTier(int $tier): int
     {
-        $base = $this->configInt('LEARN_CHECKPOINT_BASE_TOKENS', 360);
-        $step = $this->configInt('LEARN_CHECKPOINT_STEP_TOKENS', 220);
+        $base = $this->configInt('LEARN_CHECKPOINT_BASE_TOKENS', 180);
+        $step = $this->configInt('LEARN_CHECKPOINT_STEP_TOKENS', 140);
         return $base + max(0, $tier - 1) * $step;
     }
 

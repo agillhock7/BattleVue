@@ -262,6 +262,31 @@ class LearningRepo
         $stmt->execute([':session_id' => $sessionId, ':tier' => $tier]);
     }
 
+    public function countUserMessagesSinceLastCheckpoint(int $sessionId): int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) AS cnt
+             FROM learning_messages lm
+             WHERE lm.session_id = :session_id
+               AND lm.role = "user"
+               AND lm.created_at > COALESCE(
+                 (
+                   SELECT MAX(submitted_at)
+                   FROM learning_checkpoints
+                   WHERE session_id = :checkpoint_session_id
+                     AND submitted_at IS NOT NULL
+                 ),
+                 "1970-01-01 00:00:00"
+               )'
+        );
+        $stmt->execute([
+            ':session_id' => $sessionId,
+            ':checkpoint_session_id' => $sessionId,
+        ]);
+        $row = $stmt->fetch();
+        return (int) ($row['cnt'] ?? 0);
+    }
+
     public function listCheckpoints(int $sessionId): array
     {
         $stmt = $this->db->prepare(
