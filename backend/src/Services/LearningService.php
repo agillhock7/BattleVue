@@ -71,6 +71,12 @@ class LearningService
         $checkpoints = $this->repo->listCheckpoints($sessionId);
         $pending = $this->repo->getPendingCheckpoint($sessionId);
         $botPoints = $this->repo->getBotPoints($userId);
+        $starterPrompts = $this->starterPromptsForTopic(
+            (string) $session['topic_slug'],
+            (string) $session['topic_title'],
+            $session['starter_prompts_json'] ?? null
+        );
+        $suggestedPrompts = $this->normalizeSuggestedPrompts($session, $starterPrompts, count($messages));
 
         $nextTier = max(1, ((int) $session['last_checkpoint_tier']) + 1);
         $nextTarget = $this->tokenTargetForTier($nextTier);
@@ -85,12 +91,8 @@ class LearningService
                 'topic_slug' => $session['topic_slug'],
                 'topic_title' => $session['topic_title'],
                 'topic_description' => $session['topic_description'],
-                'starter_prompts' => $this->starterPromptsForTopic(
-                    (string) $session['topic_slug'],
-                    (string) $session['topic_title'],
-                    $session['starter_prompts_json'] ?? null
-                ),
-                'suggested_prompts' => $this->normalizeSuggestedPrompts($session),
+                'starter_prompts' => $starterPrompts,
+                'suggested_prompts' => $suggestedPrompts,
                 'status' => $session['status'],
                 'completion_reason' => $session['completion_reason'] ?? null,
                 'completed_at' => $session['completed_at'] ?? null,
@@ -372,7 +374,7 @@ class LearningService
         }
     }
 
-    private function normalizeSuggestedPrompts(array $session): array
+    private function normalizeSuggestedPrompts(array $session, array $starterPrompts, int $messageCount): array
     {
         $json = $session['suggested_prompts_json'] ?? null;
         if (is_string($json) && $json !== '') {
@@ -380,15 +382,25 @@ class LearningService
             if (is_array($decoded)) {
                 $clean = array_values(array_filter(array_map(static fn($p) => trim((string) $p), $decoded), static fn($p) => $p !== ''));
                 if (count($clean) > 0) {
+                    if ($messageCount <= 2 && $this->samePromptSet($clean, $starterPrompts)) {
+                        return [];
+                    }
                     return array_slice($clean, 0, 6);
                 }
             }
         }
 
-        return $this->starterPromptsForTopic(
-            (string) ($session['topic_slug'] ?? ''),
-            (string) ($session['topic_title'] ?? 'this topic'),
-            $session['starter_prompts_json'] ?? null
-        );
+        return [];
+    }
+
+    private function samePromptSet(array $a, array $b): bool
+    {
+        $normalize = static function (array $items): array {
+            $out = array_map(static fn($p) => mb_strtolower(trim((string) $p)), $items);
+            sort($out);
+            return $out;
+        };
+
+        return $normalize($a) === $normalize($b);
     }
 }

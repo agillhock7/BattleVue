@@ -63,7 +63,7 @@
           </div>
         </div>
 
-        <div class="card col" v-if="sessionState.session.suggested_prompts?.length && !isSessionCompleted">
+        <div class="card col" v-if="sessionState.session.suggested_prompts?.length && !isSessionCompleted && sessionState.messages.length > 0">
           <strong>Suggested Next Inputs</strong>
           <p class="muted" style="margin: 0;">These are generated from your current direction. Tap one to continue.</p>
           <div class="row">
