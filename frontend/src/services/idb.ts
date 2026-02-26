@@ -17,9 +17,36 @@ const dbPromise = openDB('battlevue-cache', 1, {
   }
 });
 
+function cloneForStorage<T>(value: T): T {
+  try {
+    if (typeof structuredClone === 'function') {
+      return structuredClone(value);
+    }
+  } catch {
+    // Fall through to JSON clone.
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    // Last-resort clone to avoid IndexedDB DataCloneError for exotic values.
+    return JSON.parse(
+      JSON.stringify(value, (_key, val) => {
+        if (typeof val === 'bigint') {
+          return val.toString();
+        }
+        if (typeof val === 'function' || typeof val === 'symbol') {
+          return undefined;
+        }
+        return val;
+      })
+    );
+  }
+}
+
 export async function cacheQuest(quest: any) {
   const db = await dbPromise;
-  await db.put('quests', { ...quest, cached_at: Date.now() });
+  await db.put('quests', { ...cloneForStorage(quest), cached_at: Date.now() });
 }
 
 export async function getCachedQuest(id: number) {
@@ -29,7 +56,7 @@ export async function getCachedQuest(id: number) {
 
 export async function cacheReplay(id: number, replay: any) {
   const db = await dbPromise;
-  await db.put('replays', { id, replay, cached_at: Date.now() });
+  await db.put('replays', { id, replay: cloneForStorage(replay), cached_at: Date.now() });
 }
 
 export async function getCachedReplay(id: number) {
@@ -39,7 +66,7 @@ export async function getCachedReplay(id: number) {
 
 export async function saveDraft(key: string, value: any) {
   const db = await dbPromise;
-  await db.put('drafts', { key, value, updated_at: Date.now() });
+  await db.put('drafts', { key, value: cloneForStorage(value), updated_at: Date.now() });
 }
 
 export async function loadDraft(key: string) {
@@ -51,6 +78,7 @@ export async function enqueueOutbox(entry: { endpoint: string; method: 'POST'; p
   const db = await dbPromise;
   await db.add('outbox', {
     ...entry,
+    payload: cloneForStorage(entry.payload),
     created_at: Date.now()
   });
 }
