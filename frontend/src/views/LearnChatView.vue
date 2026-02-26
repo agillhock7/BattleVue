@@ -40,7 +40,8 @@
         <div class="chat-window">
           <div v-for="message in sessionState.messages" :key="message.id" :class="['chat-msg', message.role]">
             <div class="role">{{ message.role }}</div>
-            <div>{{ message.content }}</div>
+            <div v-if="message.role === 'assistant'" class="assistant-markdown" v-html="formatAssistant(message.content)"></div>
+            <div v-else class="plain-message">{{ message.content }}</div>
           </div>
         </div>
 
@@ -100,6 +101,7 @@
 import { onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api } from '@/services/api';
+import { renderAssistantMarkdown } from '@/utils/markdown';
 
 const route = useRoute();
 const router = useRouter();
@@ -250,6 +252,10 @@ async function submitCheckpoint() {
     submittingCheckpoint.value = false;
   }
 }
+
+function formatAssistant(content: string) {
+  return renderAssistantMarkdown(content);
+}
 </script>
 
 <style scoped>
@@ -277,6 +283,51 @@ async function submitCheckpoint() {
 
 .chat-msg.assistant {
   background: rgba(14, 165, 233, 0.14);
+}
+
+.plain-message {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.assistant-markdown :deep(p) {
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+
+.assistant-markdown :deep(ul),
+.assistant-markdown :deep(ol) {
+  margin: 6px 0 10px 18px;
+  padding: 0;
+}
+
+.assistant-markdown :deep(li) {
+  margin: 3px 0;
+}
+
+.assistant-markdown :deep(code) {
+  background: rgba(2, 11, 26, 0.8);
+  border: 1px solid rgba(142, 166, 203, 0.25);
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+.assistant-markdown :deep(pre) {
+  background: rgba(2, 11, 26, 0.92);
+  border: 1px solid rgba(142, 166, 203, 0.25);
+  border-radius: 8px;
+  padding: 10px;
+  overflow: auto;
+  margin: 8px 0 10px;
+}
+
+.assistant-markdown :deep(pre code) {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
 }
 
 .role {

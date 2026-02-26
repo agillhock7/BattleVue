@@ -29,6 +29,7 @@ class AiTutorService
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
             ['role' => 'system', 'content' => 'You are teaching topic: ' . $topicTitle . '. Keep responses concise and practical. Ask one follow-up question at the end.'],
+            ['role' => 'system', 'content' => 'Formatting rules: use Markdown. Prefer this structure when possible: 1) short concept, 2) practical example, 3) quick exercise, 4) one follow-up question. Use fenced code blocks for code and bullet lists for steps.'],
         ];
 
         foreach ($conversation as $entry) {
