@@ -1,29 +1,43 @@
 <template>
-  <section class="grid two">
-    <article class="panel col">
-      <h2>Learning Topics</h2>
-      <div class="list">
-        <button class="ghost" v-for="topic in topics" :key="topic.id" @click="startSession(topic.id)">
+  <section class="learn-dashboard">
+    <aside class="panel col learn-sidebar">
+      <div class="row" style="justify-content: space-between; align-items: center;">
+        <h2 style="margin: 0;">Learning Topics</h2>
+        <RouterLink class="ghost" to="/learn">Overview</RouterLink>
+      </div>
+
+      <div class="list topic-list">
+        <button
+          class="ghost topic-btn"
+          v-for="topic in topics"
+          :key="topic.id"
+          @click="startSession(topic.id)"
+          :class="{ active: topic.id === activeTopicId }"
+        >
           <strong>{{ topic.title }}</strong>
           <div class="muted">{{ topic.description }}</div>
         </button>
       </div>
 
-      <div class="card col">
+      <div class="card col create-topic-card">
         <strong>Create Custom Topic</strong>
         <input v-model="customTitle" placeholder="e.g. Laravel Queues" />
-        <textarea v-model="customDescription" rows="4" placeholder="Describe what you want to learn and current skill level"></textarea>
+        <textarea
+          v-model="customDescription"
+          rows="4"
+          placeholder="Describe what you want to learn and current skill level"
+        ></textarea>
         <button @click="createCustomTopic" :disabled="creatingTopic">{{ creatingTopic ? 'Creating...' : 'Create + Start' }}</button>
       </div>
 
       <p v-if="error" style="color: #fca5a5">{{ error }}</p>
-    </article>
+    </aside>
 
-    <article class="panel col">
+    <article class="panel col learn-main">
       <template v-if="sessionState">
         <div class="row" style="justify-content: space-between; align-items: center;">
           <h2 style="margin: 0">{{ sessionState.session.topic_title }}</h2>
-          <RouterLink class="ghost" to="/learn">Back to Learn</RouterLink>
+          <div class="muted">Guided tutor thread</div>
         </div>
 
         <div class="card col checkpoint-overview">
@@ -51,7 +65,8 @@
                 <span :style="{ width: `${sessionState.session.tier_progress_percent || 0}%` }"></span>
               </div>
               <div class="muted progress-meta">
-                {{ sessionState.session.tokens_to_next_checkpoint }} user tokens and {{ sessionState.session.turns_to_next_checkpoint }} turns to next checkpoint.
+                {{ sessionState.session.tokens_to_next_checkpoint }} user tokens and
+                {{ sessionState.session.turns_to_next_checkpoint }} turns to next checkpoint.
               </div>
             </div>
 
@@ -68,11 +83,13 @@
           </div>
         </div>
 
-        <div class="chat-window" ref="chatWindowRef">
-          <div v-for="message in sessionState.messages" :key="message.id" :class="['chat-msg', message.role]">
-            <div class="role">{{ message.role }}</div>
-            <div v-if="message.role === 'assistant'" class="assistant-markdown" v-html="formatAssistant(message.content)"></div>
-            <div v-else class="plain-message">{{ message.content }}</div>
+        <div class="chat-shell">
+          <div class="chat-window" ref="chatWindowRef">
+            <div v-for="message in sessionState.messages" :key="message.id" :class="['chat-msg', message.role]">
+              <div class="role">{{ message.role }}</div>
+              <div v-if="message.role === 'assistant'" class="assistant-markdown" v-html="formatAssistant(message.content)"></div>
+              <div v-else class="plain-message">{{ message.content }}</div>
+            </div>
           </div>
         </div>
 
@@ -143,7 +160,7 @@
           <div class="muted">Start a new session to continue learning deeper.</div>
         </div>
 
-        <div class="row" style="align-items: flex-end;" v-if="!isSessionCompleted">
+        <div class="row composer" v-if="!isSessionCompleted">
           <textarea v-model="draftMessage" rows="3" placeholder="Ask the tutor anything about this topic..."></textarea>
           <button @click="sendMessage" :disabled="sendingMessage">{{ sendingMessage ? 'Sending...' : 'Send' }}</button>
         </div>
@@ -156,8 +173,10 @@
       </template>
 
       <template v-else>
-        <h2>Start a Learning Session</h2>
-        <p class="muted">Pick a topic from the left to begin your guided study conversation.</p>
+        <div class="learn-empty panel col">
+          <h2 style="margin: 0;">Start a Learning Session</h2>
+          <p class="muted" style="margin: 0;">Choose a topic from the sidebar to launch a focused tutor thread.</p>
+        </div>
       </template>
     </article>
   </section>
@@ -191,6 +210,7 @@ const lastCheckpointResult = ref<any | null>(null);
 
 const error = ref('');
 const isSessionCompleted = computed(() => sessionState.value?.session?.status === 'completed');
+const activeTopicId = computed(() => Number(sessionState.value?.session?.topic_id || 0));
 const pendingQuestionCount = computed(() => Number(sessionState.value?.pending_checkpoint?.quiz?.questions?.length || 0));
 const canSubmitCheckpoint = computed(() => {
   if (!sessionState.value?.pending_checkpoint) {
@@ -228,9 +248,12 @@ watch(
 
 watch(
   () => sessionState.value?.messages?.length,
-  async () => {
+  async (newCount, oldCount) => {
     await nextTick();
     enhanceCodeBlocks();
+    if ((newCount ?? 0) > 0) {
+      scrollToLatestMessage(oldCount ? 'smooth' : 'auto');
+    }
   }
 );
 
@@ -278,6 +301,7 @@ async function loadSession(sessionId: number) {
     }
     await nextTick();
     enhanceCodeBlocks();
+    scrollToLatestMessage('auto');
   } catch (e: any) {
     error.value = e?.message || 'Failed to load session';
   }
@@ -291,6 +315,8 @@ async function startSession(topicId: number) {
     checkpointAnswers.value = [];
     showCheckpointPanel.value = false;
     await router.push(`/learn/chat/${data.session.id}`);
+    await nextTick();
+    scrollToLatestMessage('auto');
   } catch (e: any) {
     error.value = e?.message || 'Failed to start session';
   }
@@ -388,6 +414,14 @@ function formatAssistant(content: string) {
   return renderAssistantMarkdown(content);
 }
 
+function scrollToLatestMessage(behavior: ScrollBehavior = 'auto') {
+  const root = chatWindowRef.value;
+  if (!root) {
+    return;
+  }
+  root.scrollTo({ top: root.scrollHeight, behavior });
+}
+
 function enhanceCodeBlocks() {
   const root = chatWindowRef.value;
   if (!root) {
@@ -440,12 +474,53 @@ function fallbackCopyText(text: string) {
 </script>
 
 <style scoped>
+.learn-dashboard {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.learn-sidebar {
+  max-height: calc(100vh - 100px);
+  position: sticky;
+  top: 84px;
+  overflow: auto;
+}
+
+.learn-main {
+  min-height: calc(100vh - 100px);
+}
+
+.topic-list {
+  max-height: 44vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.topic-btn {
+  text-align: left;
+  border-width: 1px;
+}
+
+.topic-btn.active {
+  border-color: rgba(74, 222, 128, 0.6);
+  background: rgba(22, 163, 74, 0.18);
+}
+
+.create-topic-card {
+  margin-top: 4px;
+}
+
+.chat-shell {
+  min-height: 440px;
+}
+
 .chat-window {
   border: 1px solid rgba(142, 166, 203, 0.3);
   border-radius: 12px;
   background: rgba(7, 15, 31, 0.78);
   padding: 12px;
-  max-height: 420px;
+  height: min(64vh, 720px);
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -658,6 +733,42 @@ function fallbackCopyText(text: string) {
   gap: 8px;
 }
 
+.composer {
+  align-items: flex-end;
+  flex-wrap: nowrap;
+}
+
+.composer textarea {
+  min-height: 88px;
+}
+
+.learn-empty {
+  border: 1px dashed rgba(142, 166, 203, 0.35);
+}
+
+@media (max-width: 1080px) {
+  .learn-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .learn-sidebar {
+    position: static;
+    max-height: none;
+  }
+
+  .topic-list {
+    max-height: 32vh;
+  }
+
+  .learn-main {
+    min-height: 0;
+  }
+
+  .chat-window {
+    height: min(58vh, 620px);
+  }
+}
+
 @media (max-width: 640px) {
   .tier-track {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -665,6 +776,10 @@ function fallbackCopyText(text: string) {
 
   .checkpoint-banner-head {
     align-items: stretch;
+  }
+
+  .composer {
+    flex-wrap: wrap;
   }
 }
 </style>
