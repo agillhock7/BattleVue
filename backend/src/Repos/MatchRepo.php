@@ -210,13 +210,16 @@ class MatchRepo
                     u.username AS opponent_username,
                     u.display_name AS opponent_display_name
              FROM matches m
-             INNER JOIN match_players mp ON mp.match_id = m.id AND mp.user_id = :uid
-             LEFT JOIN match_players opp ON opp.match_id = m.id AND opp.user_id <> :uid
+             INNER JOIN match_players mp ON mp.match_id = m.id AND mp.user_id = :uid_me
+             LEFT JOIN match_players opp ON opp.match_id = m.id AND opp.user_id <> :uid_opp
              LEFT JOIN users u ON u.id = opp.user_id
              ORDER BY m.created_at DESC
              LIMIT ' . (int) $limit
         );
-        $stmt->execute([':uid' => $userId]);
+        $stmt->execute([
+            ':uid_me' => $userId,
+            ':uid_opp' => $userId,
+        ]);
         return $stmt->fetchAll();
     }
 
