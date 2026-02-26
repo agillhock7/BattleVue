@@ -18,3 +18,7 @@ deployment:
         find "$APIDIR" -mindepth 1 -maxdepth 1 ! -name 'config.php' -exec rm -rf {} +
         cp -R api/. "$APIDIR/"
       fi
+    - |
+      if [ -f "$APIDIR/config/config.php" ]; then
+        php "$APIDIR/scripts/migrate.php"
+      fi
