@@ -1,131 +1,178 @@
 <template>
   <section class="panel preview-shell">
-    <div class="preview-left">
-      <div class="preview-head">
+    <div class="scene-col">
+      <div class="scene-head">
         <div>
-          <p class="eyebrow">Live Build Preview</p>
+          <p class="eyebrow">Build Bay</p>
           <h3>{{ botName }}</h3>
-          <p class="muted">{{ archetypeLabel }} profile | Chassis: {{ chassisLabel }}</p>
+          <p class="muted">{{ archetypeLabel }} rig | Chassis {{ chassisLabel }}</p>
         </div>
-        <div class="lane-pill" :class="`lane-${laneClass}`">
-          Lane: {{ laneLabel }}
-        </div>
-      </div>
-
-      <div class="arena-stage">
-        <div class="lane-grid">
-          <div class="lane-col" :class="{ active: laneClass === 'left' }">
-            <span>Left</span>
-          </div>
-          <div class="lane-col" :class="{ active: laneClass === 'mid' }">
-            <span>Mid</span>
-          </div>
-          <div class="lane-col" :class="{ active: laneClass === 'right' }">
-            <span>Right</span>
-          </div>
-        </div>
-
-        <div class="bot-core-wrap" :class="`at-${laneClass}`">
-          <div class="bot-orbit" v-for="(module, idx) in orbitModules" :key="`${module.slug}-${idx}`" :style="orbitStyle(idx, orbitModules.length)">
-            <span :class="['module-dot', module.type]" :title="moduleLabel(module)"></span>
-          </div>
-
-          <div class="bot-core" :class="archetypeClass">
-            <div class="bot-eye"></div>
-            <div class="bot-eye"></div>
-          </div>
+        <div class="score-gauge" :style="{ '--score': `${combatScorePercent}%` }">
+          <span>{{ combatScore }}</span>
+          <small>Combat</small>
         </div>
       </div>
 
-      <div class="stats-grid">
+      <div class="hangar">
+        <div class="hangar-glow"></div>
+        <div class="hangar-grid"></div>
+        <div class="scanline"></div>
+
+        <div class="lane-deck">
+          <div class="lane" :class="{ active: laneClass === 'left' }"><span>LEFT</span></div>
+          <div class="lane" :class="{ active: laneClass === 'mid' }"><span>MID</span></div>
+          <div class="lane" :class="{ active: laneClass === 'right' }"><span>RIGHT</span></div>
+        </div>
+
+        <div class="target-track" :class="`at-${laneClass}`">
+          <span></span>
+        </div>
+
+        <div class="bot-stage" :class="`lane-${laneClass}`">
+          <div class="bot-shadow"></div>
+
+          <div class="module-orbit ring-a">
+            <i
+              v-for="(module, idx) in ringAModules"
+              :key="`a-${module.slug}-${idx}`"
+              :class="['satellite', module.type]"
+              :style="orbitStyle(idx, ringAModules.length, 62)"
+              :title="moduleLabel(module)"
+            ></i>
+          </div>
+
+          <div class="module-orbit ring-b">
+            <i
+              v-for="(module, idx) in ringBModules"
+              :key="`b-${module.slug}-${idx}`"
+              :class="['satellite', module.type]"
+              :style="orbitStyle(idx, ringBModules.length, 86)"
+              :title="moduleLabel(module)"
+            ></i>
+          </div>
+
+          <div class="bot-frame" :class="archetypeClass">
+            <div class="bot-antenna"></div>
+
+            <div class="bot-head">
+              <div class="visor">
+                <span></span>
+              </div>
+            </div>
+
+            <div class="bot-arm left"></div>
+            <div class="bot-arm right"></div>
+
+            <div class="bot-torso">
+              <div class="core-ring"></div>
+              <div class="core-dot"></div>
+            </div>
+
+            <div class="bot-leg left"></div>
+            <div class="bot-leg right"></div>
+
+            <div class="thrusters">
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-panel">
         <div class="stat-row">
           <span>HP</span>
-          <div class="bar"><i :style="{ width: `${hpPercent}%` }"></i></div>
+          <div class="bar hp"><i :style="{ width: `${hpPercent}%` }"></i></div>
           <strong>{{ hp }}</strong>
         </div>
         <div class="stat-row">
-          <span>Speed</span>
+          <span>SPD</span>
           <div class="bar speed"><i :style="{ width: `${speedPercent}%` }"></i></div>
           <strong>{{ speed }}</strong>
         </div>
         <div class="stat-row">
-          <span>Power</span>
+          <span>PWR</span>
           <div class="bar power"><i :style="{ width: `${powerPercent}%` }"></i></div>
           <strong>{{ power }}</strong>
         </div>
       </div>
     </div>
 
-    <div class="preview-right">
-      <div class="card col preview-card">
-        <strong>Loadout Signature</strong>
-        <div class="module-summary">
+    <div class="intel-col">
+      <div class="card col intel-card">
+        <strong>Loadout Matrix</strong>
+        <div class="module-matrix">
           <div>
-            <span class="label">Weapon</span>
+            <label>Weapon</label>
             <strong>{{ moduleCounts.weapon }}</strong>
           </div>
           <div>
-            <span class="label">Defense</span>
+            <label>Defense</label>
             <strong>{{ moduleCounts.defense }}</strong>
           </div>
           <div>
-            <span class="label">Mobility</span>
+            <label>Mobility</label>
             <strong>{{ moduleCounts.mobility }}</strong>
           </div>
           <div>
-            <span class="label">Utility</span>
+            <label>Utility</label>
             <strong>{{ moduleCounts.utility }}</strong>
           </div>
         </div>
 
-        <div class="row chips" v-if="modules.length">
-          <span v-for="(module, idx) in modules.slice(0, 8)" :key="`${module.slug}-${idx}`" class="module-chip" :class="module.type">
+        <div class="chip-cloud" v-if="modules.length">
+          <span
+            v-for="(module, idx) in modules.slice(0, 10)"
+            :key="`${module.slug}-${idx}`"
+            class="module-chip"
+            :class="module.type"
+          >
             {{ shortSlug(module.slug) }}
           </span>
         </div>
         <p class="muted" v-else>No modules mounted yet.</p>
       </div>
 
-      <div class="card col preview-card">
-        <strong>Behavior Snapshot</strong>
-        <div class="action-bars">
-          <div class="action-line">
-            <span>Attack</span>
-            <div class="bar"><i :style="{ width: `${actionPercents.attack}%` }"></i></div>
-            <strong>{{ actionCounts.attack }}</strong>
-          </div>
-          <div class="action-line">
-            <span>Guard</span>
-            <div class="bar speed"><i :style="{ width: `${actionPercents.guard}%` }"></i></div>
-            <strong>{{ actionCounts.guard }}</strong>
-          </div>
-          <div class="action-line">
-            <span>Shift</span>
-            <div class="bar power"><i :style="{ width: `${actionPercents.shift}%` }"></i></div>
-            <strong>{{ actionCounts.shift }}</strong>
-          </div>
-          <div class="action-line">
-            <span>Wait</span>
-            <div class="bar neutral"><i :style="{ width: `${actionPercents.wait}%` }"></i></div>
-            <strong>{{ actionCounts.wait }}</strong>
-          </div>
+      <div class="card col intel-card">
+        <strong>Behavior Signature</strong>
+        <div class="action-row">
+          <span>Attack</span>
+          <div class="bar attack"><i :style="{ width: `${actionPercents.attack}%` }"></i></div>
+          <strong>{{ actionCounts.attack }}</strong>
+        </div>
+        <div class="action-row">
+          <span>Guard</span>
+          <div class="bar guard"><i :style="{ width: `${actionPercents.guard}%` }"></i></div>
+          <strong>{{ actionCounts.guard }}</strong>
+        </div>
+        <div class="action-row">
+          <span>Shift</span>
+          <div class="bar shift"><i :style="{ width: `${actionPercents.shift}%` }"></i></div>
+          <strong>{{ actionCounts.shift }}</strong>
+        </div>
+        <div class="action-row">
+          <span>Wait</span>
+          <div class="bar wait"><i :style="{ width: `${actionPercents.wait}%` }"></i></div>
+          <strong>{{ actionCounts.wait }}</strong>
         </div>
 
-        <div class="muted" v-if="topRuleLabel">
-          Top priority: {{ topRuleLabel }}
-        </div>
+        <div class="muted" v-if="topRuleLabel">Top rule: {{ topRuleLabel }}</div>
         <div class="muted" v-else>No rules yet.</div>
       </div>
 
-      <div class="card col preview-card">
-        <strong>Readiness</strong>
-        <div class="readiness-item">
+      <div class="card col intel-card">
+        <strong>Deployment Readiness</strong>
+        <div class="readiness-line">
           <span>Blueprint</span>
-          <span :class="blueprintReady ? 'ok' : 'warn'">{{ blueprintReady ? 'Ready' : 'Needs Work' }}</span>
+          <b :class="blueprintReady ? 'ok' : 'warn'">{{ blueprintReady ? 'Ready' : 'Needs Work' }}</b>
         </div>
-        <div class="readiness-item">
+        <div class="readiness-line">
           <span>Ruleset</span>
-          <span :class="rulesetReady ? 'ok' : 'warn'">{{ rulesetReady ? 'Ready' : 'Needs Work' }}</span>
+          <b :class="rulesetReady ? 'ok' : 'warn'">{{ rulesetReady ? 'Ready' : 'Needs Work' }}</b>
+        </div>
+        <div class="readiness-line">
+          <span>Lane Plan</span>
+          <b>{{ laneLabel }}</b>
         </div>
       </div>
     </div>
@@ -143,15 +190,17 @@ const props = defineProps<{
 }>();
 
 const modules = computed(() => (Array.isArray(props.blueprint?.modules) ? props.blueprint.modules : []));
-const orbitModules = computed(() => modules.value.slice(0, 6));
+
+const ringAModules = computed(() => modules.value.slice(0, 4));
+const ringBModules = computed(() => modules.value.slice(4, 8));
 
 const hp = computed(() => Number(props.blueprint?.stats?.hp || 0));
 const speed = computed(() => Number(props.blueprint?.stats?.speed || 0));
 const power = computed(() => Number(props.blueprint?.stats?.power || 0));
 
-const hpPercent = computed(() => clampPercent(hp.value));
-const speedPercent = computed(() => clampPercent(speed.value));
-const powerPercent = computed(() => clampPercent(power.value));
+const hpPercent = computed(() => clampPercent(hp.value, 220));
+const speedPercent = computed(() => clampPercent(speed.value, 220));
+const powerPercent = computed(() => clampPercent(power.value, 220));
 
 const laneClass = computed(() => {
   const lane = String(props.blueprint?.lane_pref || 'adaptive');
@@ -166,18 +215,13 @@ const laneLabel = computed(() => {
   if (lane === 'adaptive') {
     return 'Adaptive';
   }
-  if (lane === 'mid') {
-    return 'Mid';
-  }
   if (lane === 'left') {
     return 'Left';
   }
-  return 'Right';
-});
-
-const chassisLabel = computed(() => {
-  const slug = String(props.blueprint?.chassis || 'chassis-starter');
-  return slug.replace(/-/g, ' ');
+  if (lane === 'right') {
+    return 'Right';
+  }
+  return 'Mid';
 });
 
 const botName = computed(() => {
@@ -185,8 +229,10 @@ const botName = computed(() => {
   return name !== '' ? name : 'Unnamed Prototype';
 });
 
+const chassisLabel = computed(() => String(props.blueprint?.chassis || 'chassis-starter').replace(/-/g, ' '));
+
 const archetypeClass = computed(() => {
-  if (hp.value >= 160 && speed.value <= 10) {
+  if (hp.value >= 170 && speed.value <= 10) {
     return 'tank';
   }
   if (speed.value >= 16 && power.value >= 16) {
@@ -235,10 +281,7 @@ const actionCounts = computed(() => {
 });
 
 const actionPercents = computed(() => {
-  const total = Math.max(
-    1,
-    actionCounts.value.attack + actionCounts.value.guard + actionCounts.value.shift + actionCounts.value.wait
-  );
+  const total = Math.max(1, actionCounts.value.attack + actionCounts.value.guard + actionCounts.value.shift + actionCounts.value.wait);
   return {
     attack: Math.round((actionCounts.value.attack / total) * 100),
     guard: Math.round((actionCounts.value.guard / total) * 100),
@@ -254,9 +297,7 @@ const topRuleLabel = computed(() => {
   }
   rules.sort((a, b) => Number(b?.priority || 0) - Number(a?.priority || 0));
   const top = rules[0];
-  const sensor = String(top?.when?.sensor || 'sensor');
-  const action = String(top?.then?.action || 'wait').replace('_', ' ');
-  return `${sensor} -> ${action}`;
+  return `${String(top?.when?.sensor || 'sensor')} => ${String(top?.then?.action || 'wait')}`;
 });
 
 const blueprintReady = computed(() => {
@@ -273,16 +314,24 @@ const rulesetReady = computed(() => {
   return Array.isArray(props.ruleset?.rules) && props.ruleset.rules.length > 0;
 });
 
-function clampPercent(value: number) {
-  const clamped = Math.max(0, Math.min(200, value));
-  return Math.round((clamped / 200) * 100);
+const combatScore = computed(() => {
+  const moduleWeight = modules.value.length * 8;
+  const statWeight = hp.value * 0.35 + speed.value * 0.3 + power.value * 0.35;
+  return Math.max(1, Math.round(Math.min(100, statWeight / 2.2 + moduleWeight)));
+});
+
+const combatScorePercent = computed(() => combatScore.value);
+
+function clampPercent(value: number, max: number) {
+  const safe = Math.max(0, Math.min(max, value));
+  return Math.round((safe / max) * 100);
 }
 
-function orbitStyle(index: number, total: number) {
+function orbitStyle(index: number, total: number, radius: number) {
   const safeTotal = Math.max(1, total);
   const angle = (360 / safeTotal) * index;
   return {
-    transform: `rotate(${angle}deg) translate(56px) rotate(-${angle}deg)`,
+    transform: `rotate(${angle}deg) translate(${radius}px) rotate(-${angle}deg)`,
   };
 }
 
@@ -298,189 +347,425 @@ function moduleLabel(module: any) {
 <style scoped>
 .preview-shell {
   display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 12px;
+  grid-template-columns: 1.35fr 0.85fr;
+  gap: 14px;
   background:
-    radial-gradient(circle at 15% 12%, rgba(56, 189, 248, 0.16), transparent 42%),
-    radial-gradient(circle at 85% 86%, rgba(34, 197, 94, 0.14), transparent 42%),
-    rgba(10, 24, 45, 0.78);
+    radial-gradient(circle at 12% 10%, rgba(14, 165, 233, 0.16), transparent 45%),
+    radial-gradient(circle at 88% 90%, rgba(34, 197, 94, 0.12), transparent 40%),
+    rgba(10, 24, 45, 0.8);
 }
 
-.preview-left,
-.preview-right {
+.scene-col,
+.intel-col {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.preview-head {
+.scene-head {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
   align-items: flex-start;
+  gap: 12px;
 }
 
-.preview-head h3 {
+.scene-head h3 {
   margin: 2px 0 0;
 }
 
 .eyebrow {
   margin: 0;
   font-size: 11px;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
+  color: #8ca4c8;
+}
+
+.score-gauge {
+  --score: 0%;
+  width: 76px;
+  height: 76px;
+  border-radius: 999px;
+  background: conic-gradient(#22d3ee var(--score), rgba(148, 163, 184, 0.22) 0);
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.score-gauge::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 999px;
+  background: rgba(6, 17, 33, 0.94);
+  border: 1px solid rgba(142, 166, 203, 0.25);
+}
+
+.score-gauge span,
+.score-gauge small {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  line-height: 1;
+}
+
+.score-gauge span {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.score-gauge small {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
   color: #9fb1cc;
 }
 
-.lane-pill {
-  border: 1px solid rgba(142, 166, 203, 0.35);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 12px;
-  background: rgba(7, 15, 31, 0.5);
-}
-
-.lane-pill.lane-left,
-.lane-pill.lane-mid,
-.lane-pill.lane-right {
-  border-color: rgba(56, 189, 248, 0.45);
-}
-
-.arena-stage {
-  border: 1px solid rgba(142, 166, 203, 0.24);
-  border-radius: 12px;
-  background: rgba(5, 15, 29, 0.78);
-  padding: 14px;
-  min-height: 230px;
+.hangar {
   position: relative;
+  border: 1px solid rgba(142, 166, 203, 0.25);
+  border-radius: 14px;
   overflow: hidden;
+  min-height: 340px;
+  background: rgba(4, 14, 28, 0.9);
 }
 
-.lane-grid {
+.hangar-glow {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 72%, rgba(56, 189, 248, 0.28), transparent 50%),
+    radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.2), transparent 35%),
+    radial-gradient(circle at 80% 30%, rgba(34, 197, 94, 0.13), transparent 35%);
+  pointer-events: none;
+}
+
+.hangar-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0));
+}
+
+.scanline {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 0%, rgba(34, 211, 238, 0.2) 48%, transparent 100%);
+  transform: translateY(-100%);
+  animation: scan 4.2s linear infinite;
+}
+
+.lane-deck {
+  position: absolute;
+  inset: 12px 12px auto;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  height: 100%;
+  gap: 10px;
 }
 
-.lane-col {
-  border: 1px dashed rgba(142, 166, 203, 0.22);
+.lane {
+  border: 1px dashed rgba(142, 166, 203, 0.28);
   border-radius: 10px;
+  min-height: 220px;
   position: relative;
-  min-height: 190px;
 }
 
-.lane-col span {
+.lane span {
   position: absolute;
   top: 8px;
   left: 8px;
-  font-size: 12px;
-  color: #8fa6c8;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #8ca4c8;
 }
 
-.lane-col.active {
-  border-color: rgba(56, 189, 248, 0.56);
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.15), rgba(56, 189, 248, 0.03));
+.lane.active {
+  border-color: rgba(34, 211, 238, 0.55);
+  box-shadow: inset 0 0 40px rgba(14, 165, 233, 0.2);
 }
 
-.bot-core-wrap {
+.target-track {
   position: absolute;
-  bottom: 34px;
+  bottom: 46px;
   left: 50%;
-  width: 132px;
-  height: 132px;
-  margin-left: -66px;
+  transform: translateX(-50%);
+  width: 240px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.65), transparent);
+}
+
+.target-track span {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #67e8f9;
+  box-shadow: 0 0 12px rgba(103, 232, 249, 0.9);
+  animation: pulse-track 2.6s ease-in-out infinite;
+}
+
+.target-track.at-left {
+  transform: translateX(-160px);
+}
+
+.target-track.at-mid {
+  transform: translateX(-50%);
+}
+
+.target-track.at-right {
+  transform: translateX(60px);
+}
+
+.bot-stage {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  width: 220px;
+  height: 220px;
+  margin-left: -110px;
   transition: transform 0.35s ease;
 }
 
-.bot-core-wrap.at-left {
-  transform: translateX(-100px);
+.bot-stage.lane-left {
+  transform: translateX(-128px);
 }
 
-.bot-core-wrap.at-mid {
+.bot-stage.lane-mid {
   transform: translateX(0);
 }
 
-.bot-core-wrap.at-right {
-  transform: translateX(100px);
+.bot-stage.lane-right {
+  transform: translateX(128px);
 }
 
-.bot-orbit {
+.bot-shadow {
   position: absolute;
-  top: 50%;
+  bottom: 22px;
   left: 50%;
-  margin: -6px 0 0 -6px;
+  width: 96px;
+  height: 20px;
+  margin-left: -48px;
+  border-radius: 999px;
+  background: rgba(8, 47, 73, 0.65);
+  filter: blur(8px);
 }
 
-.module-dot {
+.module-orbit {
+  position: absolute;
+  inset: 0;
+  animation: rotate 16s linear infinite;
+}
+
+.module-orbit.ring-b {
+  animation-direction: reverse;
+  animation-duration: 22s;
+}
+
+.satellite {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 12px;
   height: 12px;
+  margin: -6px 0 0 -6px;
   border-radius: 999px;
-  display: block;
-  box-shadow: 0 0 10px rgba(14, 165, 233, 0.6);
+  box-shadow: 0 0 14px rgba(34, 211, 238, 0.55);
 }
 
-.module-dot.weapon {
-  background: #f97316;
+.satellite.weapon {
+  background: #fb923c;
 }
 
-.module-dot.defense {
-  background: #22c55e;
+.satellite.defense {
+  background: #4ade80;
 }
 
-.module-dot.mobility {
+.satellite.mobility {
   background: #38bdf8;
 }
 
-.module-dot.utility {
+.satellite.utility {
   background: #c084fc;
 }
 
-.bot-core {
-  width: 72px;
-  height: 72px;
-  margin: 28px auto 0;
-  border-radius: 20px;
-  border: 1px solid rgba(142, 166, 203, 0.32);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  animation: float 2.4s ease-in-out infinite;
-  box-shadow: inset 0 0 18px rgba(56, 189, 248, 0.18);
+.bot-frame {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  width: 120px;
+  height: 156px;
+  margin-left: -60px;
+  animation: bob 3s ease-in-out infinite;
 }
 
-.bot-core.balanced {
-  background: linear-gradient(180deg, rgba(56, 189, 248, 0.28), rgba(8, 47, 73, 0.56));
+.bot-head {
+  width: 68px;
+  height: 42px;
+  margin: 0 auto;
+  border-radius: 14px;
+  border: 1px solid rgba(142, 166, 203, 0.35);
+  background: linear-gradient(180deg, rgba(22, 44, 75, 0.95), rgba(10, 24, 44, 0.95));
+  display: grid;
+  place-items: center;
 }
 
-.bot-core.tank {
-  background: linear-gradient(180deg, rgba(34, 197, 94, 0.28), rgba(21, 75, 52, 0.56));
+.visor {
+  width: 44px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(8, 25, 49, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  overflow: hidden;
 }
 
-.bot-core.striker {
-  background: linear-gradient(180deg, rgba(249, 115, 22, 0.28), rgba(100, 43, 10, 0.56));
+.visor span {
+  display: block;
+  width: 18px;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, #67e8f9, transparent);
+  animation: visor-scan 1.4s linear infinite;
 }
 
-.bot-eye {
+.bot-antenna {
+  width: 3px;
+  height: 16px;
+  margin: 0 auto 6px;
+  background: rgba(56, 189, 248, 0.6);
+  position: relative;
+}
+
+.bot-antenna::after {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 999px;
+  background: #67e8f9;
+  box-shadow: 0 0 8px rgba(103, 232, 249, 0.9);
+}
+
+.bot-arm,
+.bot-leg,
+.bot-torso {
+  position: absolute;
+  border: 1px solid rgba(142, 166, 203, 0.33);
+  background: rgba(11, 28, 50, 0.92);
+}
+
+.bot-torso {
+  width: 78px;
+  height: 66px;
+  left: 50%;
+  top: 52px;
+  margin-left: -39px;
+  border-radius: 16px;
+}
+
+.core-ring {
+  position: absolute;
+  inset: 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  animation: spin 5.6s linear infinite;
+}
+
+.core-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 10px;
   height: 10px;
+  margin: -5px 0 0 -5px;
   border-radius: 999px;
-  background: #dbeafe;
-  box-shadow: 0 0 8px rgba(219, 234, 254, 0.8);
+  background: #22d3ee;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.9);
 }
 
-.stats-grid,
-.action-bars {
+.bot-arm {
+  width: 16px;
+  height: 56px;
+  top: 58px;
+  border-radius: 10px;
+}
+
+.bot-arm.left {
+  left: 10px;
+  transform: rotate(10deg);
+}
+
+.bot-arm.right {
+  right: 10px;
+  transform: rotate(-10deg);
+}
+
+.bot-leg {
+  width: 20px;
+  height: 40px;
+  bottom: 0;
+  border-radius: 10px;
+}
+
+.bot-leg.left {
+  left: 34px;
+}
+
+.bot-leg.right {
+  right: 34px;
+}
+
+.thrusters {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  width: 72px;
+  margin-left: -36px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.thrusters span {
+  width: 10px;
+  height: 22px;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.2), rgba(56, 189, 248, 0.65), rgba(34, 211, 238, 0));
+  animation: flame 0.55s ease-in-out infinite;
+}
+
+.thrusters span:last-child {
+  animation-delay: 0.2s;
+}
+
+.bot-frame.tank .bot-torso,
+.bot-frame.tank .bot-head {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: linear-gradient(180deg, rgba(17, 60, 43, 0.95), rgba(8, 32, 23, 0.95));
+}
+
+.bot-frame.striker .bot-torso,
+.bot-frame.striker .bot-head {
+  border-color: rgba(251, 146, 60, 0.45);
+  background: linear-gradient(180deg, rgba(87, 39, 14, 0.95), rgba(45, 19, 8, 0.95));
+}
+
+.stats-panel,
+.action-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .stat-row,
-.action-line {
+.action-row {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) 38px;
+  grid-template-columns: 54px minmax(0, 1fr) 34px;
   gap: 8px;
   align-items: center;
   font-size: 13px;
@@ -489,40 +774,46 @@ function moduleLabel(module: any) {
 .bar {
   height: 8px;
   border-radius: 999px;
-  background: rgba(12, 24, 44, 0.84);
-  border: 1px solid rgba(142, 166, 203, 0.24);
   overflow: hidden;
+  border: 1px solid rgba(142, 166, 203, 0.24);
+  background: rgba(9, 23, 43, 0.85);
 }
 
 .bar i {
   display: block;
   height: 100%;
+}
+
+.bar.hp i,
+.bar.attack i {
   background: linear-gradient(90deg, #22d3ee, #3b82f6);
 }
 
-.bar.speed i {
+.bar.speed i,
+.bar.guard i {
   background: linear-gradient(90deg, #34d399, #10b981);
 }
 
-.bar.power i {
+.bar.power i,
+.bar.shift i {
   background: linear-gradient(90deg, #fb923c, #f97316);
 }
 
-.bar.neutral i {
+.bar.wait i {
   background: linear-gradient(90deg, #94a3b8, #64748b);
 }
 
-.preview-card {
-  background: rgba(7, 18, 35, 0.72);
+.intel-card {
+  background: rgba(7, 20, 38, 0.72);
 }
 
-.module-summary {
+.module-matrix {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
-.module-summary > div {
+.module-matrix > div {
   border: 1px solid rgba(142, 166, 203, 0.2);
   border-radius: 10px;
   padding: 8px;
@@ -530,14 +821,16 @@ function moduleLabel(module: any) {
   flex-direction: column;
 }
 
-.module-summary .label {
+.module-matrix label {
   font-size: 11px;
-  color: #8fa6c8;
+  color: #8ca4c8;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
 }
 
-.chips {
+.chip-cloud {
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -550,22 +843,22 @@ function moduleLabel(module: any) {
 }
 
 .module-chip.weapon {
-  border-color: rgba(249, 115, 22, 0.45);
+  border-color: rgba(251, 146, 60, 0.5);
 }
 
 .module-chip.defense {
-  border-color: rgba(34, 197, 94, 0.45);
+  border-color: rgba(74, 222, 128, 0.5);
 }
 
 .module-chip.mobility {
-  border-color: rgba(56, 189, 248, 0.45);
+  border-color: rgba(56, 189, 248, 0.5);
 }
 
 .module-chip.utility {
-  border-color: rgba(192, 132, 252, 0.45);
+  border-color: rgba(192, 132, 252, 0.5);
 }
 
-.readiness-item {
+.readiness-line {
   display: flex;
   justify-content: space-between;
   font-size: 14px;
@@ -579,26 +872,104 @@ function moduleLabel(module: any) {
   color: #f59e0b;
 }
 
-@keyframes float {
-  0% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
+@keyframes bob {
+  0%,
   100% {
     transform: translateY(0);
   }
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
-@media (max-width: 960px) {
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes flame {
+  0%,
+  100% {
+    height: 18px;
+    opacity: 0.75;
+  }
+  50% {
+    height: 26px;
+    opacity: 1;
+  }
+}
+
+@keyframes visor-scan {
+  from {
+    transform: translateX(-24px);
+  }
+  to {
+    transform: translateX(42px);
+  }
+}
+
+@keyframes scan {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(110%);
+  }
+}
+
+@keyframes pulse-track {
+  0% {
+    transform: translateX(0);
+    opacity: 0.75;
+  }
+  50% {
+    transform: translateX(232px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 0.75;
+  }
+}
+
+@media (max-width: 1100px) {
   .preview-shell {
     grid-template-columns: 1fr;
   }
 
-  .bot-core-wrap.at-left,
-  .bot-core-wrap.at-right {
+  .bot-stage.lane-left,
+  .bot-stage.lane-right {
     transform: translateX(0);
+  }
+
+  .target-track.at-left,
+  .target-track.at-right {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanline,
+  .target-track span,
+  .bot-frame,
+  .module-orbit,
+  .core-ring,
+  .thrusters span,
+  .visor span {
+    animation: none;
   }
 }
 </style>
