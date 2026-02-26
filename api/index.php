@@ -449,6 +449,11 @@ try {
         Response::ok(['matches' => $matchService->history((int) $ctx['user']['id'])]);
     }
 
+    if (matchRoute($method, $path, 'GET', '#^/matches/(\d+)$#', $params)) {
+        $ctx = $auth->requireUser();
+        Response::ok($matchService->detail((int) $ctx['user']['id'], (int) $params[1]));
+    }
+
     if (matchRoute($method, $path, 'GET', '#^/matches/(\d+)/replay$#', $params)) {
         $ctx = $auth->requireUser();
         Response::ok($matchService->replay((int) $ctx['user']['id'], (int) $params[1]));

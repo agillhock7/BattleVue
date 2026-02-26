@@ -151,6 +151,67 @@ class MatchService
         return $this->matchRepo->history($userId);
     }
 
+    public function detail(int $userId, int $matchId): array
+    {
+        $detail = $this->matchRepo->matchDetailForUser($matchId, $userId);
+        if (!$detail) {
+            throw new RuntimeException('Match not found.');
+        }
+
+        $players = $this->matchRepo->playersForMatch($matchId);
+        $self = null;
+        foreach ($players as $player) {
+            if ((int) $player['user_id'] === $userId) {
+                $self = $player;
+                break;
+            }
+        }
+
+        if (!$self) {
+            throw new RuntimeException('Match not found.');
+        }
+
+        $status = (string) ($detail['status'] ?? 'queued');
+        $canSubmit = in_array($status, ['queued', 'awaiting_submission'], true) && empty($self['submitted_at']);
+        $canReplay = $status === 'completed';
+
+        return [
+            'match' => [
+                'id' => (int) $detail['id'],
+                'mode' => $detail['mode'],
+                'status' => $status,
+                'seed' => (int) $detail['seed'],
+                'simulator_version' => $detail['simulator_version'],
+                'winner_user_id' => isset($detail['winner_user_id']) ? (int) $detail['winner_user_id'] : null,
+                'created_at' => $detail['created_at'],
+                'started_at' => $detail['started_at'],
+                'completed_at' => $detail['completed_at'],
+            ],
+            'self' => [
+                'user_id' => (int) $self['user_id'],
+                'slot_order' => (int) $self['slot_order'],
+                'blueprint_id' => isset($self['blueprint_id']) ? (int) $self['blueprint_id'] : null,
+                'ruleset_id' => isset($self['ruleset_id']) ? (int) $self['ruleset_id'] : null,
+                'submitted_at' => $self['submitted_at'],
+                'result' => $self['result'],
+                'hp_remaining' => isset($self['hp_remaining']) ? (int) $self['hp_remaining'] : null,
+            ],
+            'players' => array_map(static function (array $row) {
+                return [
+                    'user_id' => (int) $row['user_id'],
+                    'slot_order' => (int) $row['slot_order'],
+                    'username' => $row['username'],
+                    'display_name' => $row['display_name'],
+                    'submitted_at' => $row['submitted_at'],
+                    'result' => $row['result'],
+                    'hp_remaining' => isset($row['hp_remaining']) ? (int) $row['hp_remaining'] : null,
+                ];
+            }, $players),
+            'can_submit' => $canSubmit,
+            'can_replay' => $canReplay,
+        ];
+    }
+
     public function replay(int $userId, int $matchId): array
     {
         $access = $this->matchRepo->getMatchForUser($matchId, $userId);

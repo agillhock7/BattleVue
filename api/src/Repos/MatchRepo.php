@@ -206,6 +206,9 @@ class MatchRepo
         $stmt = $this->db->prepare(
             'SELECT m.id, m.mode, m.status, m.seed, m.simulator_version, m.created_at, m.completed_at, m.winner_user_id,
                     mp.result AS my_result,
+                    mp.submitted_at AS my_submitted_at,
+                    mp.blueprint_id AS my_blueprint_id,
+                    mp.ruleset_id AS my_ruleset_id,
                     opp.user_id AS opponent_id,
                     u.username AS opponent_username,
                     u.display_name AS opponent_display_name
@@ -220,6 +223,45 @@ class MatchRepo
             ':uid_me' => $userId,
             ':uid_opp' => $userId,
         ]);
+        return $stmt->fetchAll();
+    }
+
+    public function matchDetailForUser(int $matchId, int $userId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT m.id, m.mode, m.status, m.seed, m.simulator_version, m.created_at, m.started_at, m.completed_at, m.winner_user_id,
+                    mp_self.id AS self_player_id,
+                    mp_self.slot_order AS self_slot_order,
+                    mp_self.blueprint_id AS self_blueprint_id,
+                    mp_self.ruleset_id AS self_ruleset_id,
+                    mp_self.submitted_at AS self_submitted_at,
+                    mp_self.result AS self_result,
+                    mp_self.hp_remaining AS self_hp_remaining
+             FROM matches m
+             INNER JOIN match_players mp_self ON mp_self.match_id = m.id AND mp_self.user_id = :user_id
+             WHERE m.id = :match_id
+             LIMIT 1'
+        );
+        $stmt->execute([
+            ':user_id' => $userId,
+            ':match_id' => $matchId,
+        ]);
+
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function playersForMatch(int $matchId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT mp.id, mp.match_id, mp.user_id, mp.slot_order, mp.blueprint_id, mp.ruleset_id, mp.submitted_at, mp.result, mp.hp_remaining,
+                    u.username, u.display_name
+             FROM match_players mp
+             INNER JOIN users u ON u.id = mp.user_id
+             WHERE mp.match_id = :match_id
+             ORDER BY mp.slot_order ASC'
+        );
+        $stmt->execute([':match_id' => $matchId]);
         return $stmt->fetchAll();
     }
 
