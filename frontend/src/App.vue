@@ -21,15 +21,15 @@
 
     <OfflineBanner :online="network.online" :api-healthy="network.apiHealthy" />
 
-    <main class="main-wrap">
+    <main :class="['main-wrap', { 'main-wrap--wide': isLearnRoute }]">
       <RouterView />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { RouterLink, RouterView, useRouter } from 'vue-router';
+import { computed, onMounted } from 'vue';
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import OfflineBanner from '@/components/OfflineBanner.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -39,7 +39,9 @@ import { flushOutbox } from '@/services/sync';
 const auth = useAuthStore();
 const notifications = useNotificationsStore();
 const network = useNetworkStore();
+const route = useRoute();
 const router = useRouter();
+const isLearnRoute = computed(() => route.path.startsWith('/learn'));
 
 onMounted(async () => {
   network.start();

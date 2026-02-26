@@ -476,7 +476,7 @@ function fallbackCopyText(text: string) {
 <style scoped>
 .learn-dashboard {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 14px;
 }
 
@@ -520,7 +520,7 @@ function fallbackCopyText(text: string) {
   border-radius: 12px;
   background: rgba(7, 15, 31, 0.78);
   padding: 12px;
-  height: min(64vh, 720px);
+  height: min(68vh, 760px);
   overflow: auto;
   display: flex;
   flex-direction: column;

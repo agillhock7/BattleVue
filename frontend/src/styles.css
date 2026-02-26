@@ -82,6 +82,10 @@ button, input, select, textarea {
   margin: 0 auto;
 }
 
+.main-wrap--wide {
+  max-width: 1540px;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
