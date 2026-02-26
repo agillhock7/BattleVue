@@ -1,69 +1,259 @@
 <template>
-  <section class="grid two">
-    <article class="panel col">
-      <h2>Inventory</h2>
-      <div class="list">
-        <div class="card" v-for="item in inventory" :key="item.slug">
-          <strong>{{ item.name }}</strong>
-          <div class="muted">{{ item.item_type }} | Qty {{ item.quantity }}</div>
+  <section class="workshop-layout">
+    <aside class="panel col workshop-sidebar">
+      <h2 style="margin: 0;">Bot Forge</h2>
+      <p class="muted" style="margin: 0;">Build a blueprint, attach a ruleset, validate, then use both in Battle submission.</p>
+
+      <div class="card col">
+        <strong>Build Progress</strong>
+        <div class="progress-item">
+          <span :class="['dot', buildProgress.blueprint ? 'ok' : 'todo']"></span>
+          <span>Blueprint configured (name + chassis + modules)</span>
+        </div>
+        <div class="progress-item">
+          <span :class="['dot', buildProgress.ruleset ? 'ok' : 'todo']"></span>
+          <span>Ruleset configured (name + at least 1 rule)</span>
+        </div>
+        <div class="progress-item">
+          <span :class="['dot', buildProgress.savedBlueprint ? 'ok' : 'todo']"></span>
+          <span>Blueprint saved</span>
+        </div>
+        <div class="progress-item">
+          <span :class="['dot', buildProgress.savedRuleset ? 'ok' : 'todo']"></span>
+          <span>Ruleset saved</span>
         </div>
       </div>
 
-      <h3>Blueprints</h3>
-      <div class="list">
-        <button class="ghost" v-for="bp in blueprints" :key="bp.id" @click="loadBlueprint(bp)">{{ bp.name }}</button>
+      <div class="card col">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <strong>Inventory</strong>
+          <span class="muted">{{ inventory.length }} items</span>
+        </div>
+
+        <div class="inventory-stats">
+          <span>Chassis: {{ chassisItems.length }}</span>
+          <span>Modules: {{ moduleItems.length }}</span>
+        </div>
+
+        <div v-if="!inventory.length" class="muted">
+          No inventory unlocked yet. You can still use starter slugs and save builds.
+        </div>
+
+        <div class="list" v-else>
+          <div class="inventory-row" v-for="item in inventory" :key="item.slug">
+            <strong>{{ item.name }}</strong>
+            <span class="muted">{{ item.item_type }} | Qty {{ item.quantity }}</span>
+          </div>
+        </div>
       </div>
 
-      <h3>Rulesets</h3>
-      <div class="list">
-        <button class="ghost" v-for="rs in rulesets" :key="rs.id" @click="loadRuleset(rs)">{{ rs.name }}</button>
+      <div class="card col" v-if="moduleLibrary.length">
+        <strong>Quick Add Modules</strong>
+        <div class="row">
+          <button
+            v-for="module in moduleLibrary"
+            :key="`quick-${module.slug}`"
+            type="button"
+            class="ghost chip"
+            @click="addModuleFromLibrary(module)"
+          >
+            + {{ module.name }}
+          </button>
+        </div>
       </div>
-    </article>
 
-    <article class="col" style="gap: 14px;">
-      <BlueprintBuilder v-model="blueprintDraft" />
-      <div class="row">
-        <button @click="saveBlueprint">Save Blueprint</button>
-        <button class="ghost" @click="validateBlueprint">Validate</button>
+      <div class="card col">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <strong>Saved Blueprints</strong>
+          <span class="muted">{{ blueprints.length }}</span>
+        </div>
+        <div class="list" v-if="blueprints.length">
+          <button class="ghost saved-btn" v-for="bp in blueprints" :key="bp.id" @click="loadBlueprint(bp)">
+            <strong>{{ bp.name }}</strong>
+            <span class="muted">{{ bp.chassis }} | modules {{ (bp.modules || []).length }}</span>
+          </button>
+        </div>
+        <div class="muted" v-else>No blueprints saved yet.</div>
+      </div>
+
+      <div class="card col">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <strong>Saved Rulesets</strong>
+          <span class="muted">{{ rulesets.length }}</span>
+        </div>
+        <div class="list" v-if="rulesets.length">
+          <button class="ghost saved-btn" v-for="rs in rulesets" :key="rs.id" @click="loadRuleset(rs)">
+            <strong>{{ rs.name }}</strong>
+            <span class="muted">rules {{ (rs.rules || []).length }}</span>
+          </button>
+        </div>
+        <div class="muted" v-else>No rulesets saved yet.</div>
+      </div>
+    </aside>
+
+    <article class="col workshop-main">
+      <div class="panel col">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0;">Quick Build Assistant</h3>
+          <button class="ghost" @click="resetDrafts">Reset Drafts</button>
+        </div>
+        <p class="muted" style="margin: 0;">Use presets to start instantly, then tune details in the builders below.</p>
+
+        <div class="row">
+          <button @click="applyBlueprintPreset('balanced')">Balanced Blueprint</button>
+          <button class="ghost" @click="applyBlueprintPreset('tank')">Tank Blueprint</button>
+          <button class="ghost" @click="applyBlueprintPreset('striker')">Striker Blueprint</button>
+        </div>
+
+        <div class="row">
+          <button @click="applyRulesetPreset('balanced')">Balanced Rules</button>
+          <button class="ghost" @click="applyRulesetPreset('aggressive')">Aggressive Rules</button>
+          <button class="ghost" @click="applyRulesetPreset('defensive')">Defensive Rules</button>
+        </div>
+      </div>
+
+      <BlueprintBuilder
+        v-model="blueprintDraft"
+        :module-options="moduleLibrary"
+        :chassis-options="chassisLibrary"
+      />
+
+      <div class="row action-row">
+        <button @click="saveBlueprint">{{ editingBlueprintId ? 'Update Blueprint' : 'Save Blueprint' }}</button>
+        <button class="ghost" @click="validateBlueprint">Validate Blueprint</button>
+      </div>
+
+      <div class="card validation" v-if="blueprintValidation">
+        <strong>{{ blueprintValidation.valid ? 'Blueprint Valid' : 'Blueprint Issues' }}</strong>
+        <div v-if="blueprintValidation.valid" class="muted">Looks good for match submission.</div>
+        <ul v-else>
+          <li v-for="errorMsg in blueprintValidation.errors" :key="errorMsg">{{ errorMsg }}</li>
+        </ul>
       </div>
 
       <RuleBuilder v-model="rulesetDraft" />
-      <div class="row">
-        <button @click="saveRuleset">Save Ruleset</button>
-        <button class="ghost" @click="validateRuleset">Validate</button>
+
+      <div class="row action-row">
+        <button @click="saveRuleset">{{ editingRulesetId ? 'Update Ruleset' : 'Save Ruleset' }}</button>
+        <button class="ghost" @click="validateRuleset">Validate Ruleset</button>
       </div>
 
-      <p class="muted">{{ status }}</p>
+      <div class="card validation" v-if="rulesetValidation">
+        <strong>{{ rulesetValidation.valid ? 'Ruleset Valid' : 'Ruleset Issues' }}</strong>
+        <div v-if="rulesetValidation.valid" class="muted">Rules are allowlisted and simulation-safe.</div>
+        <ul v-else>
+          <li v-for="errorMsg in rulesetValidation.errors" :key="errorMsg">{{ errorMsg }}</li>
+        </ul>
+      </div>
+
+      <p class="status-line" :class="{ error: statusIsError }">{{ status }}</p>
     </article>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import BlueprintBuilder from '@/components/BlueprintBuilder.vue';
 import RuleBuilder from '@/components/RuleBuilder.vue';
 import { api } from '@/services/api';
 import { loadDraft, saveDraft } from '@/services/idb';
 
+type ValidationResponse = { valid: boolean; errors: string[] };
+type ModuleOption = { slug: string; name: string; type: string };
+type ChassisOption = { slug: string; name: string };
+
 const inventory = ref<any[]>([]);
 const blueprints = ref<any[]>([]);
 const rulesets = ref<any[]>([]);
-const status = ref('');
 
 const blueprintDraft = ref<any>({
   name: '',
   chassis: 'chassis-starter',
   lane_pref: 'adaptive',
   modules: [],
-  stats: { hp: 100, speed: 10, power: 10 }
+  stats: { hp: 130, speed: 12, power: 14 },
 });
 const rulesetDraft = ref<any>({ name: '', rules: [] });
+
+const blueprintValidation = ref<ValidationResponse | null>(null);
+const rulesetValidation = ref<ValidationResponse | null>(null);
+
+const status = ref('Use Quick Build Assistant or start editing manually.');
+const statusIsError = ref(false);
 
 let editingBlueprintId = 0;
 let editingRulesetId = 0;
 
+const chassisItems = computed(() => inventory.value.filter((item) => item.item_type === 'chassis'));
+const moduleItems = computed(() => inventory.value.filter((item) => item.item_type === 'module'));
+
+const moduleLibrary = computed<ModuleOption[]>(() => {
+  const fromInventory = moduleItems.value.map((item) => ({
+    slug: String(item.slug),
+    name: String(item.name),
+    type: inferModuleType(item.slug),
+  }));
+
+  const fallback: ModuleOption[] = [
+    { slug: 'module-laser-mk1', name: 'Laser MK1', type: 'weapon' },
+    { slug: 'module-shield-mk1', name: 'Shield MK1', type: 'defense' },
+    { slug: 'module-thruster-mk1', name: 'Thruster MK1', type: 'mobility' },
+    { slug: 'module-scanner-mk1', name: 'Scanner MK1', type: 'utility' },
+  ];
+
+  const seen = new Set<string>();
+  const merged = [...fromInventory, ...fallback].filter((item) => {
+    if (seen.has(item.slug)) {
+      return false;
+    }
+    seen.add(item.slug);
+    return true;
+  });
+
+  return merged;
+});
+
+const chassisLibrary = computed<ChassisOption[]>(() => {
+  const fromInventory = chassisItems.value.map((item) => ({
+    slug: String(item.slug),
+    name: String(item.name),
+  }));
+
+  const fallback: ChassisOption[] = [{ slug: 'chassis-starter', name: 'Starter Chassis' }];
+
+  const seen = new Set<string>();
+  return [...fromInventory, ...fallback].filter((item) => {
+    if (seen.has(item.slug)) {
+      return false;
+    }
+    seen.add(item.slug);
+    return true;
+  });
+});
+
+const buildProgress = computed(() => ({
+  blueprint:
+    String(blueprintDraft.value?.name || '').trim() !== '' &&
+    String(blueprintDraft.value?.chassis || '').trim() !== '' &&
+    Array.isArray(blueprintDraft.value?.modules) &&
+    blueprintDraft.value.modules.length > 0,
+  ruleset:
+    String(rulesetDraft.value?.name || '').trim() !== '' &&
+    Array.isArray(rulesetDraft.value?.rules) &&
+    rulesetDraft.value.rules.length > 0,
+  savedBlueprint: blueprints.value.length > 0,
+  savedRuleset: rulesets.value.length > 0,
+}));
+
 onMounted(async () => {
   await Promise.all([loadInventory(), loadBlueprints(), loadRulesets(), hydrateDrafts()]);
+
+  if (!blueprintDraft.value.name) {
+    applyBlueprintPreset('balanced');
+  }
+  if (!rulesetDraft.value.name) {
+    applyRulesetPreset('balanced');
+  }
 });
 
 watch(
@@ -110,47 +300,364 @@ function loadBlueprint(blueprint: any) {
     chassis: blueprint.chassis,
     lane_pref: blueprint.lane_pref,
     modules: blueprint.modules || [],
-    stats: blueprint.stats || { hp: 100, speed: 10, power: 10 }
+    stats: blueprint.stats || { hp: 130, speed: 12, power: 14 },
   };
+  blueprintValidation.value = null;
+  setStatus(`Loaded blueprint "${blueprint.name}".`, false);
 }
 
 function loadRuleset(ruleset: any) {
   editingRulesetId = Number(ruleset.id);
   rulesetDraft.value = {
     name: ruleset.name,
-    rules: ruleset.rules || []
+    rules: ruleset.rules || [],
   };
+  rulesetValidation.value = null;
+  setStatus(`Loaded ruleset "${ruleset.name}".`, false);
+}
+
+function resetDrafts() {
+  editingBlueprintId = 0;
+  editingRulesetId = 0;
+  blueprintDraft.value = {
+    name: '',
+    chassis: 'chassis-starter',
+    lane_pref: 'adaptive',
+    modules: [],
+    stats: { hp: 130, speed: 12, power: 14 },
+  };
+  rulesetDraft.value = { name: '', rules: [] };
+  blueprintValidation.value = null;
+  rulesetValidation.value = null;
+  setStatus('Drafts reset.', false);
 }
 
 async function saveBlueprint() {
+  const validation = await runBlueprintValidation();
+  if (!validation.valid) {
+    setStatus('Blueprint has validation errors.', true);
+    return;
+  }
+
   if (editingBlueprintId) {
     await api.post('/blueprints/update', { ...blueprintDraft.value, blueprint_id: editingBlueprintId });
-    status.value = 'Blueprint updated.';
+    setStatus('Blueprint updated.', false);
   } else {
-    await api.post('/blueprints/create', blueprintDraft.value);
-    status.value = 'Blueprint created.';
+    const created = await api.post<{ blueprint_id: number }>('/blueprints/create', blueprintDraft.value);
+    editingBlueprintId = Number(created.blueprint_id || 0);
+    setStatus('Blueprint created.', false);
   }
+
   await loadBlueprints();
 }
 
 async function saveRuleset() {
+  const validation = await runRulesetValidation();
+  if (!validation.valid) {
+    setStatus('Ruleset has validation errors.', true);
+    return;
+  }
+
   if (editingRulesetId) {
     await api.post('/rulesets/update', { ...rulesetDraft.value, ruleset_id: editingRulesetId });
-    status.value = 'Ruleset updated.';
+    setStatus('Ruleset updated.', false);
   } else {
-    await api.post('/rulesets/create', rulesetDraft.value);
-    status.value = 'Ruleset created.';
+    const created = await api.post<{ ruleset_id: number }>('/rulesets/create', rulesetDraft.value);
+    editingRulesetId = Number(created.ruleset_id || 0);
+    setStatus('Ruleset created.', false);
   }
+
   await loadRulesets();
 }
 
 async function validateBlueprint() {
-  const data = await api.post<{ valid: boolean; errors: string[] }>('/validate/blueprint', blueprintDraft.value);
-  status.value = data.valid ? 'Blueprint valid.' : `Blueprint invalid: ${data.errors.join(' ')}`;
+  const validation = await runBlueprintValidation();
+  setStatus(validation.valid ? 'Blueprint valid.' : 'Blueprint invalid.', !validation.valid);
 }
 
 async function validateRuleset() {
-  const data = await api.post<{ valid: boolean; errors: string[] }>('/validate/ruleset', rulesetDraft.value);
-  status.value = data.valid ? 'Ruleset valid.' : `Ruleset invalid: ${data.errors.join(' ')}`;
+  const validation = await runRulesetValidation();
+  setStatus(validation.valid ? 'Ruleset valid.' : 'Ruleset invalid.', !validation.valid);
+}
+
+async function runBlueprintValidation() {
+  const data = await api.post<ValidationResponse>('/validate/blueprint', blueprintDraft.value);
+  blueprintValidation.value = data;
+  return data;
+}
+
+async function runRulesetValidation() {
+  const data = await api.post<ValidationResponse>('/validate/ruleset', rulesetDraft.value);
+  rulesetValidation.value = data;
+  return data;
+}
+
+function applyBlueprintPreset(type: 'balanced' | 'tank' | 'striker') {
+  const moduleSet = buildModulePreset(type);
+
+  if (type === 'tank') {
+    blueprintDraft.value = {
+      name: 'Bulwark Tank',
+      chassis: pickChassisSlug(),
+      lane_pref: 'mid',
+      modules: moduleSet,
+      stats: { hp: 180, speed: 8, power: 12 },
+    };
+    setStatus('Applied Tank blueprint preset.', false);
+    return;
+  }
+
+  if (type === 'striker') {
+    blueprintDraft.value = {
+      name: 'Striker Blitz',
+      chassis: pickChassisSlug(),
+      lane_pref: 'adaptive',
+      modules: moduleSet,
+      stats: { hp: 95, speed: 18, power: 20 },
+    };
+    setStatus('Applied Striker blueprint preset.', false);
+    return;
+  }
+
+  blueprintDraft.value = {
+    name: 'Balanced Vanguard',
+    chassis: pickChassisSlug(),
+    lane_pref: 'adaptive',
+    modules: moduleSet,
+    stats: { hp: 130, speed: 12, power: 14 },
+  };
+  setStatus('Applied Balanced blueprint preset.', false);
+}
+
+function applyRulesetPreset(type: 'balanced' | 'aggressive' | 'defensive') {
+  if (type === 'aggressive') {
+    rulesetDraft.value = {
+      name: 'Aggressive Sweep',
+      rules: [
+        {
+          priority: 100,
+          when: { sensor: 'cooldown_ready', op: '==', value: true },
+          then: { action: 'attack_lane', params: { lane: 'mid' } },
+        },
+        {
+          priority: 90,
+          when: { sensor: 'enemy_hp_pct', op: '<=', value: 30 },
+          then: { action: 'attack_lane', params: { lane: 'mid' } },
+        },
+        {
+          priority: 20,
+          when: { sensor: 'tick', op: '>=', value: 1 },
+          then: { action: 'wait', params: { lane: 'mid' } },
+        },
+      ],
+    };
+    setStatus('Applied Aggressive ruleset preset.', false);
+    return;
+  }
+
+  if (type === 'defensive') {
+    rulesetDraft.value = {
+      name: 'Defensive Anchor',
+      rules: [
+        {
+          priority: 100,
+          when: { sensor: 'self_hp_pct', op: '<=', value: 40 },
+          then: { action: 'guard', params: { lane: 'mid' } },
+        },
+        {
+          priority: 80,
+          when: { sensor: 'enemy_lane', op: '==', value: 'left' },
+          then: { action: 'shift_lane', params: { lane: 'left' } },
+        },
+        {
+          priority: 50,
+          when: { sensor: 'tick', op: '>=', value: 1 },
+          then: { action: 'attack_lane', params: { lane: 'mid' } },
+        },
+      ],
+    };
+    setStatus('Applied Defensive ruleset preset.', false);
+    return;
+  }
+
+  rulesetDraft.value = {
+    name: 'Balanced Core',
+    rules: [
+      {
+        priority: 100,
+        when: { sensor: 'self_hp_pct', op: '<=', value: 35 },
+        then: { action: 'guard', params: { lane: 'mid' } },
+      },
+      {
+        priority: 90,
+        when: { sensor: 'cooldown_ready', op: '==', value: true },
+        then: { action: 'attack_lane', params: { lane: 'mid' } },
+      },
+      {
+        priority: 40,
+        when: { sensor: 'tick', op: '>=', value: 1 },
+        then: { action: 'wait', params: { lane: 'mid' } },
+      },
+    ],
+  };
+  setStatus('Applied Balanced ruleset preset.', false);
+}
+
+function buildModulePreset(type: 'balanced' | 'tank' | 'striker') {
+  if (type === 'tank') {
+    return [
+      { type: 'defense', slug: pickModuleSlug('defense', 'module-shield-mk1') },
+      { type: 'weapon', slug: pickModuleSlug('weapon', 'module-laser-mk1') },
+    ];
+  }
+  if (type === 'striker') {
+    return [
+      { type: 'mobility', slug: pickModuleSlug('mobility', 'module-thruster-mk1') },
+      { type: 'weapon', slug: pickModuleSlug('weapon', 'module-laser-mk1') },
+    ];
+  }
+  return [
+    { type: 'weapon', slug: pickModuleSlug('weapon', 'module-laser-mk1') },
+    { type: 'defense', slug: pickModuleSlug('defense', 'module-shield-mk1') },
+    { type: 'utility', slug: pickModuleSlug('utility', 'module-scanner-mk1') },
+  ];
+}
+
+function pickChassisSlug() {
+  return chassisLibrary.value[0]?.slug || 'chassis-starter';
+}
+
+function pickModuleSlug(type: string, fallback: string) {
+  return moduleLibrary.value.find((module) => module.type === type)?.slug || fallback;
+}
+
+function addModuleFromLibrary(module: ModuleOption) {
+  if (!Array.isArray(blueprintDraft.value.modules)) {
+    blueprintDraft.value.modules = [];
+  }
+  if (blueprintDraft.value.modules.length >= 12) {
+    setStatus('Max 12 modules allowed.', true);
+    return;
+  }
+  blueprintDraft.value.modules.push({ type: module.type, slug: module.slug });
+  setStatus(`Added module ${module.name}.`, false);
+}
+
+function inferModuleType(slug: string) {
+  if (slug.includes('shield') || slug.includes('armor') || slug.includes('guard')) {
+    return 'defense';
+  }
+  if (slug.includes('thruster') || slug.includes('boost') || slug.includes('dash')) {
+    return 'mobility';
+  }
+  if (slug.includes('scan') || slug.includes('radar') || slug.includes('support')) {
+    return 'utility';
+  }
+  return 'weapon';
+}
+
+function setStatus(message: string, isError: boolean) {
+  status.value = message;
+  statusIsError.value = isError;
 }
 </script>
+
+<style scoped>
+.workshop-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.workshop-sidebar {
+  max-height: calc(100vh - 100px);
+  position: sticky;
+  top: 84px;
+  overflow: auto;
+}
+
+.workshop-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.progress-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.dot.ok {
+  background: #22c55e;
+}
+
+.dot.todo {
+  background: #64748b;
+}
+
+.inventory-stats {
+  display: flex;
+  gap: 10px;
+  color: #9fb1cc;
+  font-size: 13px;
+}
+
+.inventory-row {
+  border: 1px solid rgba(142, 166, 203, 0.2);
+  border-radius: 10px;
+  padding: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.saved-btn {
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.chip {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.action-row {
+  align-items: center;
+}
+
+.validation ul {
+  margin: 8px 0 0 18px;
+  padding: 0;
+}
+
+.status-line {
+  margin: 0;
+  color: #9fb1cc;
+}
+
+.status-line.error {
+  color: #fca5a5;
+}
+
+@media (max-width: 1080px) {
+  .workshop-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .workshop-sidebar {
+    position: static;
+    max-height: none;
+  }
+}
+</style>

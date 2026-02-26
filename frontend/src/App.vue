@@ -21,7 +21,7 @@
 
     <OfflineBanner :online="network.online" :api-healthy="network.apiHealthy" />
 
-    <main :class="['main-wrap', { 'main-wrap--wide': isLearnRoute }]">
+    <main :class="['main-wrap', { 'main-wrap--wide': isWideRoute }]">
       <RouterView />
     </main>
   </div>
@@ -41,7 +41,12 @@ const notifications = useNotificationsStore();
 const network = useNetworkStore();
 const route = useRoute();
 const router = useRouter();
-const isLearnRoute = computed(() => route.path.startsWith('/learn'));
+const isWideRoute = computed(
+  () =>
+    route.path.startsWith('/learn') ||
+    route.path.startsWith('/workshop') ||
+    route.path.startsWith('/battle')
+);
 
 onMounted(async () => {
   network.start();
