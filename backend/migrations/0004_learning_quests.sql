@@ -1,5 +1,20 @@
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS bot_points INT NOT NULL DEFAULT 0;
+SET @has_bot_points := (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'users'
+    AND COLUMN_NAME = 'bot_points'
+);
+
+SET @alter_users_sql := IF(
+  @has_bot_points = 0,
+  'ALTER TABLE users ADD COLUMN bot_points INT NOT NULL DEFAULT 0',
+  'SELECT 1'
+);
+
+PREPARE alter_users_stmt FROM @alter_users_sql;
+EXECUTE alter_users_stmt;
+DEALLOCATE PREPARE alter_users_stmt;
 
 CREATE TABLE IF NOT EXISTS learning_topics (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
