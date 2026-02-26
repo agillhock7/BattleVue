@@ -36,6 +36,7 @@ BattleVue is a Vue 3 + Vite + TypeScript PWA with a PHP + MySQL backend for dete
       0001_init.sql
       0002_seed_core_content.sql
       0003_oauth_accounts.sql
+      0004_learning_quests.sql
     scripts/
       migrate.php
       seed.php
@@ -59,6 +60,25 @@ BattleVue is a Vue 3 + Vite + TypeScript PWA with a PHP + MySQL backend for dete
 - Frontend: Vue 3, Vite, TypeScript, Pinia, Vue Router, Vite PWA plugin
 - Backend: PHP 8.x, PDO MySQL, cookie sessions, CSRF double-submit tokens
 - Data: MySQL 8.x migrations + seed
+
+## Learning Quests (Token-Based)
+
+- `Learn Chat Quest` is available at `/learn/chat`.
+- Users pick built-in topics (WordPress, MySQL/phpMyAdmin, PostgreSQL/phpPgAdmin, Vue, Vite/npm, PHP, cPanel ops) or create custom topics.
+- Tutor conversations run as long-lived threads in `learning_sessions`.
+- Checkpoints are triggered by cumulative learner token milestones.
+- Passing checkpoints grants `bot_points` to support bot progression.
+
+Set these keys in `backend/config/config.php`:
+
+- `OPENAI_API_KEY`
+- `OPENAI_MODEL` (example: `gpt-4.1`)
+- `OPENAI_TIMEOUT_SECONDS`
+- `LEARN_CHECKPOINT_BASE_TOKENS`
+- `LEARN_CHECKPOINT_STEP_TOKENS`
+- `LEARN_CHECKPOINT_PASS_PERCENT`
+- `LEARN_POINTS_BASE`
+- `LEARN_POINTS_STEP`
 
 ## Local Setup
 
@@ -147,12 +167,22 @@ Implemented modules:
 
 - Auth: register/login/logout/me
 - Auth OAuth: Discord/GitHub start + callback
+- Learn quests: topics, custom topic, sessions start/get/message, checkpoint submit
 - Social: user search, friend request/respond/list/remove, blocks add
 - Quests: tracks, quests, quest detail, submit-step, complete
 - Inventory/Bots: inventory, blueprints create/update/list, rulesets create/update/list, validators
 - Matches: queue, challenge, submit, simulate (protected internal key), history, replay
 - Match chat polling: get/post messages
 - Notifications: list, read
+
+Learning quest endpoints:
+
+- `GET /api/learn/topics`
+- `POST /api/learn/topics/custom`
+- `POST /api/learn/sessions/start`
+- `GET /api/learn/sessions/:id`
+- `POST /api/learn/sessions/:id/message`
+- `POST /api/learn/sessions/:id/checkpoint/submit`
 
 ## Deterministic Simulation
 

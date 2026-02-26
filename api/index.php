@@ -8,13 +8,16 @@ use BattleVue\Csrf;
 use BattleVue\Db;
 use BattleVue\RateLimiter;
 use BattleVue\Repos\BotRepo;
+use BattleVue\Repos\LearningRepo;
 use BattleVue\Repos\MatchRepo;
 use BattleVue\Repos\NotificationRepo;
 use BattleVue\Repos\QuestRepo;
 use BattleVue\Repos\SocialRepo;
 use BattleVue\Repos\UserRepo;
 use BattleVue\Response;
+use BattleVue\Services\AiTutorService;
 use BattleVue\Services\BotService;
+use BattleVue\Services\LearningService;
 use BattleVue\Services\MatchService;
 use BattleVue\Services\NotificationService;
 use BattleVue\Services\OAuthService;
@@ -117,12 +120,14 @@ try {
     $socialRepo = new SocialRepo($db);
     $questRepo = new QuestRepo($db);
     $botRepo = new BotRepo($db);
+    $learningRepo = new LearningRepo($db);
     $matchRepo = new MatchRepo($db);
     $notificationRepo = new NotificationRepo($db);
 
     $socialService = new SocialService($userRepo, $socialRepo, $notificationRepo);
     $questService = new QuestService($questRepo);
     $botService = new BotService($botRepo, new BlueprintValidator(), new RulesetValidator());
+    $learningService = new LearningService($learningRepo, new AiTutorService());
     $matchService = new MatchService($matchRepo, $botService, $socialRepo, $notificationRepo, new SimulatorV1());
     $notificationService = new NotificationService($notificationRepo);
     $oauthService = new OAuthService($db, $auth);
@@ -305,6 +310,49 @@ try {
         requireCsrf($ctx);
         $result = $questService->completeQuest((int) $ctx['user']['id'], (int) $params[1]);
         Response::ok($result);
+    }
+
+    // Learning quests (AI tutor + token checkpoints)
+    if (matchRoute($method, $path, 'GET', '#^/learn/topics$#')) {
+        $ctx = $auth->requireUser();
+        Response::ok(['topics' => $learningService->listTopics((int) $ctx['user']['id'])]);
+    }
+
+    if (matchRoute($method, $path, 'POST', '#^/learn/topics/custom$#')) {
+        $ctx = $auth->requireUser();
+        requireCsrf($ctx);
+        $title = trim((string) ($body['title'] ?? ''));
+        $description = trim((string) ($body['description'] ?? ''));
+        Response::ok($learningService->createCustomTopic((int) $ctx['user']['id'], $title, $description));
+    }
+
+    if (matchRoute($method, $path, 'POST', '#^/learn/sessions/start$#')) {
+        $ctx = $auth->requireUser();
+        requireCsrf($ctx);
+        $topicId = (int) ($body['topic_id'] ?? 0);
+        if ($topicId <= 0) {
+            Response::error('topic_id is required', 422);
+        }
+        Response::ok($learningService->startSession((int) $ctx['user']['id'], $topicId));
+    }
+
+    if (matchRoute($method, $path, 'GET', '#^/learn/sessions/(\d+)$#', $params)) {
+        $ctx = $auth->requireUser();
+        Response::ok($learningService->getSession((int) $ctx['user']['id'], (int) $params[1]));
+    }
+
+    if (matchRoute($method, $path, 'POST', '#^/learn/sessions/(\d+)/message$#', $params)) {
+        $ctx = $auth->requireUser();
+        requireCsrf($ctx);
+        $message = trim((string) ($body['message'] ?? ''));
+        Response::ok($learningService->sendMessage((int) $ctx['user']['id'], (int) $params[1], $message));
+    }
+
+    if (matchRoute($method, $path, 'POST', '#^/learn/sessions/(\d+)/checkpoint/submit$#', $params)) {
+        $ctx = $auth->requireUser();
+        requireCsrf($ctx);
+        $answers = is_array($body['answers'] ?? null) ? $body['answers'] : [];
+        Response::ok($learningService->submitCheckpoint((int) $ctx['user']['id'], (int) $params[1], $answers));
     }
 
     // Inventory / Bots

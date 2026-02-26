@@ -235,6 +235,7 @@ class AuthService
             'email' => $row['email'],
             'display_name' => $row['display_name'],
             'avatar_url' => $row['avatar_url'],
+            'bot_points' => (int) ($row['bot_points'] ?? 0),
             'created_at' => $row['created_at'],
         ];
     }

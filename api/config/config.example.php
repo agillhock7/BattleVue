@@ -25,6 +25,16 @@ return [
     'BUILD_COMMIT_SHA' => '',
     'INTERNAL_SIMULATE_KEY' => 'replace_internal_key',
 
+    'OPENAI_API_KEY' => '',
+    'OPENAI_MODEL' => 'gpt-4.1',
+    'OPENAI_TIMEOUT_SECONDS' => 30,
+
+    'LEARN_CHECKPOINT_BASE_TOKENS' => 180,
+    'LEARN_CHECKPOINT_STEP_TOKENS' => 120,
+    'LEARN_CHECKPOINT_PASS_PERCENT' => 70,
+    'LEARN_POINTS_BASE' => 50,
+    'LEARN_POINTS_STEP' => 25,
+
     'OAUTH_DISCORD_CLIENT_ID' => '',
     'OAUTH_DISCORD_CLIENT_SECRET' => '',
     'OAUTH_DISCORD_REDIRECT_URI' => 'https://battlevue.gops.app/api/auth/oauth/discord/callback',
