@@ -1,0 +1,20 @@
+deployment:
+  tasks:
+    - export DOCROOT=/home/gopsapp1/battlevue.gops.app
+    - export APIDIR=/home/gopsapp1/battlevue.gops.app/api
+    - mkdir -p "$DOCROOT"
+    - mkdir -p "$APIDIR"
+    - |
+      if command -v rsync >/dev/null 2>&1; then
+        rsync -a --delete --exclude='.htaccess' --exclude='api/' dist/ "$DOCROOT/"
+      else
+        find "$DOCROOT" -mindepth 1 -maxdepth 1 ! -name '.htaccess' ! -name 'api' -exec rm -rf {} +
+        cp -R dist/. "$DOCROOT/"
+      fi
+    - |
+      if command -v rsync >/dev/null 2>&1; then
+        rsync -a --delete --exclude='config.php' api/ "$APIDIR/"
+      else
+        find "$APIDIR" -mindepth 1 -maxdepth 1 ! -name 'config.php' -exec rm -rf {} +
+        cp -R api/. "$APIDIR/"
+      fi

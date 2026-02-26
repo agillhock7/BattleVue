@@ -1,0 +1,12 @@
+Options -Indexes
+
+RewriteEngine On
+
+# Deny direct access to scripts and config
+RewriteRule ^scripts/ - [F,L]
+RewriteRule ^config/ - [F,L]
+
+# Route all API requests to index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]

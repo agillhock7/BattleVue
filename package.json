@@ -1,0 +1,10 @@
+{
+  "name": "battlevue",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build:frontend": "npm --prefix frontend run build",
+    "pack:api": "php backend/scripts/pack.php",
+    "package:deploy": "npm run build:frontend && npm run pack:api"
+  }
+}

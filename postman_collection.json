@@ -1,0 +1,59 @@
+{
+  "info": {
+    "name": "BattleVue MVP API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth Register",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"demo2\",\n  \"email\": \"demo2@example.com\",\n  \"password\": \"Pass12345!\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth Login",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"identity\": \"demo2\",\n  \"password\": \"Pass12345!\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Queue Match",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-CSRF-Token", "value": "{{csrf}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/matches/queue", "host": ["{{baseUrl}}"], "path": ["api", "matches", "queue"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mode\": \"casual\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Replay",
+      "request": {
+        "method": "GET",
+        "url": { "raw": "{{baseUrl}}/api/matches/{{matchId}}/replay", "host": ["{{baseUrl}}"], "path": ["api", "matches", "{{matchId}}", "replay"] }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "https://battlevue.gops.app" },
+    { "key": "csrf", "value": "" },
+    { "key": "matchId", "value": "1" }
+  ]
+}

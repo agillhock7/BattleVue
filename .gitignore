@@ -1,0 +1,19 @@
+# Node
+frontend/node_modules/
+frontend/.vite/
+
+# Local env/config
+.env
+backend/config/config.php
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Runtime/logs
+*.log
+backend/tmp/
+
+# Preserve committed build/package outputs for cPanel
+# dist/ and api/ are intentionally committed
