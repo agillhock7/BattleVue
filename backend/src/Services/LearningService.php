@@ -15,7 +15,17 @@ class LearningService
 
     public function listTopics(int $userId): array
     {
-        return $this->repo->listTopics($userId);
+        $topics = $this->repo->listTopics($userId);
+        return array_map(function (array $topic) {
+            return [
+                'id' => (int) $topic['id'],
+                'slug' => $topic['slug'],
+                'title' => $topic['title'],
+                'description' => $topic['description'],
+                'is_custom' => (int) ($topic['is_custom'] ?? 0),
+                'starter_prompts' => $this->starterPromptsForTopic($topic['slug'], $topic['title'], $topic['starter_prompts_json'] ?? null),
+            ];
+        }, $topics);
     }
 
     public function createCustomTopic(int $userId, string $title, string $description): array
@@ -31,7 +41,8 @@ class LearningService
         }
 
         $systemPrompt = $this->buildCustomTopicSystemPrompt($title, $description);
-        $topicId = $this->repo->createCustomTopic($userId, $title, $description, $systemPrompt);
+        $starterPrompts = $this->buildCustomTopicStarterPrompts($title);
+        $topicId = $this->repo->createCustomTopic($userId, $title, $description, $systemPrompt, $starterPrompts);
         return [
             'topic_id' => $topicId,
             'title' => $title,
@@ -72,6 +83,11 @@ class LearningService
                 'topic_slug' => $session['topic_slug'],
                 'topic_title' => $session['topic_title'],
                 'topic_description' => $session['topic_description'],
+                'starter_prompts' => $this->starterPromptsForTopic(
+                    (string) $session['topic_slug'],
+                    (string) $session['topic_title'],
+                    $session['starter_prompts_json'] ?? null
+                ),
                 'status' => $session['status'],
                 'cumulative_user_tokens' => (int) $session['cumulative_user_tokens'],
                 'cumulative_model_tokens' => (int) $session['cumulative_model_tokens'],
@@ -258,5 +274,74 @@ class LearningService
             . 'Topic scope: ' . $description . '. '
             . 'Teach through interest-based prompts and practical examples. '
             . 'Keep tone clear and supportive. Ask one thoughtful follow-up at the end of each response.';
+    }
+
+    private function buildCustomTopicStarterPrompts(string $title): array
+    {
+        return [
+            'I am brand new to ' . $title . '. What should I learn first?',
+            'Can you give me a beginner roadmap for ' . $title . '?',
+            'Give me one easy hands-on exercise to start learning ' . $title . '.',
+        ];
+    }
+
+    private function starterPromptsForTopic(string $slug, string $title, ?string $json): array
+    {
+        if ($json !== null && $json !== '') {
+            $decoded = json_decode($json, true);
+            if (is_array($decoded)) {
+                $normalized = array_values(array_filter(array_map(static fn($p) => trim((string) $p), $decoded), static fn($p) => $p !== ''));
+                if (count($normalized) > 0) {
+                    return array_slice($normalized, 0, 6);
+                }
+            }
+        }
+
+        switch ($slug) {
+            case 'wordpress':
+                return [
+                    'I am brand new to WordPress. What should I learn first?',
+                    'Can you explain themes vs plugins with simple examples?',
+                    'Give me a beginner-friendly 20-minute WordPress practice plan.',
+                ];
+            case 'mysql-phpmyadmin':
+                return [
+                    'I am new to MySQL. How do tables and relationships work?',
+                    'Teach me how to use phpMyAdmin to create a safe schema.',
+                    'What are indexes and when should I add them?',
+                ];
+            case 'postgresql-phppgadmin':
+                return [
+                    'I am new to PostgreSQL. What basics should I start with?',
+                    'How do Postgres data types differ from MySQL in practice?',
+                    'Give me a starter exercise using tables and joins in PostgreSQL.',
+                ];
+            case 'vue':
+                return [
+                    'I am new to Vue 3. Explain refs and reactive state simply.',
+                    'How do components communicate in Vue with real examples?',
+                    'Give me a short Vue practice challenge I can do right now.',
+                ];
+            case 'vite-npm':
+                return [
+                    'What does Vite do compared to older build tools?',
+                    'Teach me practical npm scripts for dev and deployment.',
+                    'How do I troubleshoot build errors in Vite quickly?',
+                ];
+            case 'php':
+                return [
+                    'I am new to PHP backend development. Where should I begin?',
+                    'How do sessions, auth, and CSRF protection fit together?',
+                    'Give me a beginner API architecture plan in PHP.',
+                ];
+            case 'devops-cpanel':
+                return [
+                    'How should I structure safe deployments on cPanel?',
+                    'Teach me how to debug Apache route and rewrite issues.',
+                    'Give me a deployment checklist to prevent downtime.',
+                ];
+            default:
+                return $this->buildCustomTopicStarterPrompts($title);
+        }
     }
 }

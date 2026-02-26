@@ -44,6 +44,23 @@
           </div>
         </div>
 
+        <div class="card col" v-if="sessionState.session.starter_prompts?.length">
+          <strong>Quick Start Prompts</strong>
+          <p class="muted" style="margin: 0;">Tap a prompt to begin if you are not sure what to ask.</p>
+          <div class="row">
+            <button
+              v-for="(prompt, idx) in sessionState.session.starter_prompts"
+              :key="`${idx}-${prompt}`"
+              class="ghost prompt-chip"
+              type="button"
+              @click="sendQuickPrompt(prompt)"
+              :disabled="sendingMessage"
+            >
+              {{ prompt }}
+            </button>
+          </div>
+        </div>
+
         <div v-if="sessionState.pending_checkpoint" class="card col">
           <h3 style="margin: 0">Checkpoint Tier {{ sessionState.pending_checkpoint.tier }}</h3>
           <p class="muted" style="margin: 0">{{ sessionState.pending_checkpoint.quiz.instructions }}</p>
@@ -174,12 +191,21 @@ async function createCustomTopic() {
 }
 
 async function sendMessage() {
+  return sendMessageWithContent(draftMessage.value);
+}
+
+async function sendQuickPrompt(prompt: string) {
+  await sendMessageWithContent(prompt);
+}
+
+async function sendMessageWithContent(raw: string) {
   const sessionId = Number(sessionState.value?.session?.id || 0);
   if (!sessionId) {
     error.value = 'Start a session first.';
     return;
   }
-  if (!draftMessage.value.trim()) {
+  const content = raw.trim();
+  if (!content) {
     return;
   }
 
@@ -187,7 +213,7 @@ async function sendMessage() {
   error.value = '';
   try {
     const data = await api.post<any>(`/learn/sessions/${sessionId}/message`, {
-      message: draftMessage.value,
+      message: content,
     });
     draftMessage.value = '';
     sessionState.value = data.state;
@@ -267,5 +293,10 @@ async function submitCheckpoint() {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.prompt-chip {
+  text-align: left;
+  white-space: normal;
 }
 </style>

@@ -13,7 +13,7 @@ class LearningRepo
     public function listTopics(int $userId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, slug, title, description, is_custom, created_by_user_id
+            'SELECT id, slug, title, description, starter_prompts_json, is_custom, created_by_user_id
              FROM learning_topics
              WHERE is_active = 1
                AND (is_custom = 0 OR created_by_user_id = :user_id)
@@ -38,7 +38,7 @@ class LearningRepo
         return $row ?: null;
     }
 
-    public function createCustomTopic(int $userId, string $title, string $description, string $systemPrompt): int
+    public function createCustomTopic(int $userId, string $title, string $description, string $systemPrompt, array $starterPrompts): int
     {
         $slugBase = preg_replace('/[^a-z0-9]+/', '-', strtolower($title)) ?: 'custom-topic';
         $slugBase = trim($slugBase, '-');
@@ -48,14 +48,15 @@ class LearningRepo
 
         $slug = substr($slugBase, 0, 72) . '-' . substr(bin2hex(random_bytes(3)), 0, 6);
         $stmt = $this->db->prepare(
-            'INSERT INTO learning_topics (slug, title, description, system_prompt, is_custom, created_by_user_id, is_active)
-             VALUES (:slug, :title, :description, :system_prompt, 1, :created_by_user_id, 1)'
+            'INSERT INTO learning_topics (slug, title, description, system_prompt, starter_prompts_json, is_custom, created_by_user_id, is_active)
+             VALUES (:slug, :title, :description, :system_prompt, :starter_prompts_json, 1, :created_by_user_id, 1)'
         );
         $stmt->execute([
             ':slug' => $slug,
             ':title' => $title,
             ':description' => $description,
             ':system_prompt' => $systemPrompt,
+            ':starter_prompts_json' => json_encode($starterPrompts, JSON_UNESCAPED_SLASHES),
             ':created_by_user_id' => $userId,
         ]);
 
@@ -75,7 +76,7 @@ class LearningRepo
     public function getSession(int $sessionId, int $userId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT ls.*, lt.slug AS topic_slug, lt.title AS topic_title, lt.description AS topic_description, lt.system_prompt
+            'SELECT ls.*, lt.slug AS topic_slug, lt.title AS topic_title, lt.description AS topic_description, lt.system_prompt, lt.starter_prompts_json
              FROM learning_sessions ls
              INNER JOIN learning_topics lt ON lt.id = ls.topic_id
              WHERE ls.id = :session_id AND ls.user_id = :user_id
