@@ -1,6 +1,11 @@
 <template>
   <section class="panel col" style="max-width: 420px; margin: 24px auto;">
     <h2>Login</h2>
+    <div class="oauth-row">
+      <a class="oauth-btn discord" href="/api/auth/oauth/discord/start">Continue with Discord</a>
+      <a class="oauth-btn github" href="/api/auth/oauth/github/start">Continue with GitHub</a>
+    </div>
+    <p class="muted" style="margin: 0;">or sign in with username/email</p>
     <label>
       Username or Email
       <input v-model="identity" autocomplete="username" />
@@ -12,21 +17,24 @@
     <button @click="submit" :disabled="loading">{{ loading ? 'Signing in...' : 'Sign In' }}</button>
     <p class="muted">No account? <RouterLink to="/register">Register</RouterLink></p>
     <p v-if="error" style="color: #fca5a5">{{ error }}</p>
+    <p v-if="oauthSuccess" style="color: #86efac">OAuth login complete.</p>
   </section>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { computed, ref } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 
 const auth = useAuthStore();
+const route = useRoute();
 const router = useRouter();
 
 const identity = ref('');
 const password = ref('');
 const loading = ref(false);
-const error = ref('');
+const error = ref(typeof route.query.oauth_error === 'string' ? route.query.oauth_error : '');
+const oauthSuccess = computed(() => route.query.oauth === 'success');
 
 async function submit() {
   loading.value = true;
@@ -41,3 +49,28 @@ async function submit() {
   }
 }
 </script>
+
+<style scoped>
+.oauth-row {
+  display: grid;
+  gap: 10px;
+}
+
+.oauth-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.oauth-btn.discord {
+  background: #5865f2;
+}
+
+.oauth-btn.github {
+  background: #111827;
+}
+</style>

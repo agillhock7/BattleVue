@@ -17,6 +17,7 @@ use BattleVue\Response;
 use BattleVue\Services\BotService;
 use BattleVue\Services\MatchService;
 use BattleVue\Services\NotificationService;
+use BattleVue\Services\OAuthService;
 use BattleVue\Services\QuestService;
 use BattleVue\Services\SocialService;
 use BattleVue\Simulator\SimulatorV1;
@@ -90,6 +91,12 @@ function matchRoute(string $method, string $path, string $wantedMethod, string $
     return true;
 }
 
+function redirectTo(string $url): void
+{
+    header('Location: ' . $url, true, 302);
+    exit;
+}
+
 try {
     enforceSameOrigin();
 
@@ -118,6 +125,7 @@ try {
     $botService = new BotService($botRepo, new BlueprintValidator(), new RulesetValidator());
     $matchService = new MatchService($matchRepo, $botService, $socialRepo, $notificationRepo, new SimulatorV1());
     $notificationService = new NotificationService($notificationRepo);
+    $oauthService = new OAuthService($db, $auth);
 
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $path = pathOnly();
@@ -186,6 +194,31 @@ try {
             Response::ok(['user' => null]);
         }
         Response::ok(['user' => $ctx['user']]);
+    }
+
+    if (matchRoute($method, $path, 'GET', '#^/auth/oauth/(discord|github)/start$#', $params)) {
+        $provider = (string) $params[1];
+        try {
+            $authUrl = $oauthService->authorizationUrl($provider);
+            redirectTo($authUrl);
+        } catch (Throwable $e) {
+            $base = rtrim((string) Config::get('APP_BASE_URL', ''), '/');
+            redirectTo($base . '/?oauth_error=' . rawurlencode($e->getMessage()));
+        }
+    }
+
+    if (matchRoute($method, $path, 'GET', '#^/auth/oauth/(discord|github)/callback$#', $params)) {
+        $provider = (string) $params[1];
+        $code = trim((string) ($_GET['code'] ?? ''));
+        $state = trim((string) ($_GET['state'] ?? ''));
+        $base = rtrim((string) Config::get('APP_BASE_URL', ''), '/');
+
+        try {
+            $oauthService->authenticateFromCallback($provider, $code, $state);
+            redirectTo($base . '/?oauth=success');
+        } catch (Throwable $e) {
+            redirectTo($base . '/?oauth_error=' . rawurlencode($e->getMessage()));
+        }
     }
 
     // Social

@@ -29,6 +29,23 @@ class AuthService
         return (int) $this->db->lastInsertId();
     }
 
+    public function createSocialUser(string $username, string $email, string $displayName, ?string $avatarUrl): int
+    {
+        $passwordHash = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
+        $stmt = $this->db->prepare(
+            'INSERT INTO users (username, email, password_hash, display_name, avatar_url)
+             VALUES (:username, :email, :password_hash, :display_name, :avatar_url)'
+        );
+        $stmt->execute([
+            ':username' => $username,
+            ':email' => $email,
+            ':password_hash' => $passwordHash,
+            ':display_name' => mb_substr($displayName !== '' ? $displayName : $username, 0, 64),
+            ':avatar_url' => $avatarUrl,
+        ]);
+        return (int) $this->db->lastInsertId();
+    }
+
     public function login(string $identity, string $password): ?array
     {
         $stmt = $this->db->prepare('SELECT * FROM users WHERE username = :identity OR email = :identity LIMIT 1');
@@ -104,6 +121,42 @@ class AuthService
             Response::error('Unauthorized', 401);
         }
         return $ctx;
+    }
+
+    public function loginByUserId(int $userId): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM users WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $userId]);
+        $user = $stmt->fetch();
+        if (!$user) {
+            return null;
+        }
+
+        $this->revokeAll((int) $user['id']);
+        $this->issueSession((int) $user['id']);
+        return $this->publicUser($user);
+    }
+
+    public function findUserByEmail(string $email): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute([':email' => $email]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function usernameExists(string $username): bool
+    {
+        $stmt = $this->db->prepare('SELECT id FROM users WHERE username = :username LIMIT 1');
+        $stmt->execute([':username' => $username]);
+        return (bool) $stmt->fetch();
+    }
+
+    public function emailExists(string $email): bool
+    {
+        $stmt = $this->db->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
+        $stmt->execute([':email' => $email]);
+        return (bool) $stmt->fetch();
     }
 
     private function issueSession(int $userId): void

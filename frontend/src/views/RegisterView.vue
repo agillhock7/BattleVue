@@ -1,6 +1,11 @@
 <template>
   <section class="panel col" style="max-width: 500px; margin: 24px auto;">
     <h2>Register</h2>
+    <div class="oauth-row">
+      <a class="oauth-btn discord" href="/api/auth/oauth/discord/start">Sign up with Discord</a>
+      <a class="oauth-btn github" href="/api/auth/oauth/github/start">Sign up with GitHub</a>
+    </div>
+    <p class="muted" style="margin: 0;">or create an account with email</p>
     <label>
       Username
       <input v-model="username" autocomplete="username" />
@@ -46,3 +51,28 @@ async function submit() {
   }
 }
 </script>
+
+<style scoped>
+.oauth-row {
+  display: grid;
+  gap: 10px;
+}
+
+.oauth-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.oauth-btn.discord {
+  background: #5865f2;
+}
+
+.oauth-btn.github {
+  background: #111827;
+}
+</style>

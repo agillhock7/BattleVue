@@ -34,7 +34,7 @@ router.beforeEach(async (to) => {
   }
 
   if (!auth.user) {
-    return '/login';
+    return { path: '/login', query: to.query };
   }
   return true;
 });

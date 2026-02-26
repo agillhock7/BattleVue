@@ -35,6 +35,7 @@ BattleVue is a Vue 3 + Vite + TypeScript PWA with a PHP + MySQL backend for dete
     migrations/
       0001_init.sql
       0002_seed_core_content.sql
+      0003_oauth_accounts.sql
     scripts/
       migrate.php
       seed.php
@@ -103,12 +104,37 @@ Target:
 - Syncs `api/` to `/api`
 - Preserves root `.htaccess`
 - Does not run `npm install`/`npm build` on server
+- Runs `php /api/scripts/migrate.php` automatically when `/api/config/config.php` exists
+
+## OAuth (Discord + GitHub)
+
+Implemented social OAuth login/signup endpoints:
+
+- `GET /api/auth/oauth/discord/start`
+- `GET /api/auth/oauth/discord/callback`
+- `GET /api/auth/oauth/github/start`
+- `GET /api/auth/oauth/github/callback`
+
+Callback URLs to configure in provider apps:
+
+- `https://battlevue.gops.app/api/auth/oauth/discord/callback`
+- `https://battlevue.gops.app/api/auth/oauth/github/callback`
+
+Set these keys in `backend/config/config.php`:
+
+- `OAUTH_DISCORD_CLIENT_ID`
+- `OAUTH_DISCORD_CLIENT_SECRET`
+- `OAUTH_DISCORD_REDIRECT_URI`
+- `OAUTH_GITHUB_CLIENT_ID`
+- `OAUTH_GITHUB_CLIENT_SECRET`
+- `OAUTH_GITHUB_REDIRECT_URI`
 
 ## Backend Security Implemented
 
 - Session auth via DB-backed session tokens (`sessions` table)
 - Cookie flags: HttpOnly session cookie, SameSite=Lax, Secure in prod
 - CSRF protection on authenticated POST routes (double-submit token)
+- OAuth state cookie with HMAC signature validation for callback integrity
 - Same-origin enforcement for CORS
 - Input validation for bot blueprints/rulesets
 - Rules DSL allowlists and hard limits
@@ -120,6 +146,7 @@ Target:
 Implemented modules:
 
 - Auth: register/login/logout/me
+- Auth OAuth: Discord/GitHub start + callback
 - Social: user search, friend request/respond/list/remove, blocks add
 - Quests: tracks, quests, quest detail, submit-step, complete
 - Inventory/Bots: inventory, blueprints create/update/list, rulesets create/update/list, validators

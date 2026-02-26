@@ -24,4 +24,12 @@ return [
     'SIMULATOR_VERSION' => 'v1',
     'BUILD_COMMIT_SHA' => '',
     'INTERNAL_SIMULATE_KEY' => 'replace_internal_key',
+
+    'OAUTH_DISCORD_CLIENT_ID' => '',
+    'OAUTH_DISCORD_CLIENT_SECRET' => '',
+    'OAUTH_DISCORD_REDIRECT_URI' => 'https://battlevue.gops.app/api/auth/oauth/discord/callback',
+
+    'OAUTH_GITHUB_CLIENT_ID' => '',
+    'OAUTH_GITHUB_CLIENT_SECRET' => '',
+    'OAUTH_GITHUB_REDIRECT_URI' => 'https://battlevue.gops.app/api/auth/oauth/github/callback',
 ];
