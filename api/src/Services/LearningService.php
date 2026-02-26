@@ -74,7 +74,9 @@ class LearningService
 
         $nextTier = max(1, ((int) $session['last_checkpoint_tier']) + 1);
         $nextTarget = $this->tokenTargetForTier($nextTier);
-        $remaining = max(0, $nextTarget - (int) $session['cumulative_user_tokens']);
+        $remaining = max(0, $nextTarget - (int) $session['cumulative_total_tokens']);
+        $sessionMax = $this->configInt('LEARN_SESSION_MAX_TOTAL_TOKENS', 9000);
+        $toSessionCompletion = max(0, $sessionMax - (int) $session['cumulative_total_tokens']);
 
         return [
             'session' => [
@@ -88,7 +90,10 @@ class LearningService
                     (string) $session['topic_title'],
                     $session['starter_prompts_json'] ?? null
                 ),
+                'suggested_prompts' => $this->normalizeSuggestedPrompts($session),
                 'status' => $session['status'],
+                'completion_reason' => $session['completion_reason'] ?? null,
+                'completed_at' => $session['completed_at'] ?? null,
                 'cumulative_user_tokens' => (int) $session['cumulative_user_tokens'],
                 'cumulative_model_tokens' => (int) $session['cumulative_model_tokens'],
                 'cumulative_total_tokens' => (int) $session['cumulative_total_tokens'],
@@ -96,6 +101,8 @@ class LearningService
                 'next_checkpoint_tier' => $nextTier,
                 'next_checkpoint_token_target' => $nextTarget,
                 'tokens_to_next_checkpoint' => $remaining,
+                'session_max_total_tokens' => $sessionMax,
+                'tokens_to_session_completion' => $toSessionCompletion,
                 'bot_points' => $botPoints,
             ],
             'messages' => $messages,
@@ -109,6 +116,10 @@ class LearningService
         $session = $this->repo->getSession($sessionId, $userId);
         if (!$session) {
             throw new RuntimeException('Learning session not found.');
+        }
+        if (($session['status'] ?? 'active') !== 'active') {
+            $reason = trim((string) ($session['completion_reason'] ?? 'This learning session is complete.'));
+            throw new RuntimeException($reason !== '' ? $reason : 'This learning session is complete.');
         }
 
         $content = trim($content);
@@ -146,26 +157,42 @@ class LearningService
         );
 
         $checkpointCreated = false;
+        $updatedSession = $this->repo->getSession($sessionId, $userId);
+        if (!$updatedSession) {
+            throw new RuntimeException('Learning session no longer exists.');
+        }
+
+        $conversationAfterReply = $this->repo->listRecentMessagesForPrompt($sessionId, 24);
+        $suggestions = $this->aiTutorService->generateSuggestedPrompts(
+            (string) $updatedSession['topic_title'],
+            (string) $updatedSession['system_prompt'],
+            $conversationAfterReply
+        );
+        $this->repo->updateSuggestedPrompts($sessionId, $suggestions);
+
         $checkpoint = $this->repo->getPendingCheckpoint($sessionId);
         if (!$checkpoint) {
-            $updatedSession = $this->repo->getSession($sessionId, $userId);
-            if (!$updatedSession) {
-                throw new RuntimeException('Learning session no longer exists.');
-            }
-
             $nextTier = max(1, ((int) $updatedSession['last_checkpoint_tier']) + 1);
             $target = $this->tokenTargetForTier($nextTier);
-            if ((int) $updatedSession['cumulative_user_tokens'] >= $target) {
+            if ((int) $updatedSession['cumulative_total_tokens'] >= $target) {
                 $quiz = $this->aiTutorService->generateCheckpointQuiz(
                     (string) $updatedSession['topic_title'],
                     (string) $updatedSession['system_prompt'],
-                    $this->repo->listRecentMessagesForPrompt($sessionId, 24),
+                    $conversationAfterReply,
                     $nextTier
                 );
 
                 $this->repo->createCheckpoint($sessionId, $nextTier, $quiz);
                 $checkpointCreated = true;
             }
+        }
+
+        $sessionMax = $this->configInt('LEARN_SESSION_MAX_TOTAL_TOKENS', 9000);
+        if ((int) $updatedSession['cumulative_total_tokens'] >= $sessionMax) {
+            $this->repo->completeSession(
+                $sessionId,
+                'Session completed: token limit reached. Start a new thread to continue learning.'
+            );
         }
 
         return [
@@ -251,8 +278,8 @@ class LearningService
 
     private function tokenTargetForTier(int $tier): int
     {
-        $base = $this->configInt('LEARN_CHECKPOINT_BASE_TOKENS', 180);
-        $step = $this->configInt('LEARN_CHECKPOINT_STEP_TOKENS', 120);
+        $base = $this->configInt('LEARN_CHECKPOINT_BASE_TOKENS', 360);
+        $step = $this->configInt('LEARN_CHECKPOINT_STEP_TOKENS', 220);
         return $base + max(0, $tier - 1) * $step;
     }
 
@@ -343,5 +370,25 @@ class LearningService
             default:
                 return $this->buildCustomTopicStarterPrompts($title);
         }
+    }
+
+    private function normalizeSuggestedPrompts(array $session): array
+    {
+        $json = $session['suggested_prompts_json'] ?? null;
+        if (is_string($json) && $json !== '') {
+            $decoded = json_decode($json, true);
+            if (is_array($decoded)) {
+                $clean = array_values(array_filter(array_map(static fn($p) => trim((string) $p), $decoded), static fn($p) => $p !== ''));
+                if (count($clean) > 0) {
+                    return array_slice($clean, 0, 6);
+                }
+            }
+        }
+
+        return $this->starterPromptsForTopic(
+            (string) ($session['topic_slug'] ?? ''),
+            (string) ($session['topic_title'] ?? 'this topic'),
+            $session['starter_prompts_json'] ?? null
+        );
     }
 }

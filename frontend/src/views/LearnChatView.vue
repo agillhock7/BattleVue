@@ -34,10 +34,11 @@
           <div class="card">
             <div><strong>User Tokens</strong>: {{ sessionState.session.cumulative_user_tokens }}</div>
             <div><strong>To Next Checkpoint</strong>: {{ sessionState.session.tokens_to_next_checkpoint }}</div>
+            <div><strong>To Session Completion</strong>: {{ sessionState.session.tokens_to_session_completion }}</div>
           </div>
         </div>
 
-        <div class="chat-window">
+        <div class="chat-window" ref="chatWindowRef">
           <div v-for="message in sessionState.messages" :key="message.id" :class="['chat-msg', message.role]">
             <div class="role">{{ message.role }}</div>
             <div v-if="message.role === 'assistant'" class="assistant-markdown" v-html="formatAssistant(message.content)"></div>
@@ -45,7 +46,7 @@
           </div>
         </div>
 
-        <div class="card col" v-if="sessionState.session.starter_prompts?.length">
+        <div class="card col" v-if="sessionState.session.starter_prompts?.length && sessionState.messages.length <= 2">
           <strong>Quick Start Prompts</strong>
           <p class="muted" style="margin: 0;">Tap a prompt to begin if you are not sure what to ask.</p>
           <div class="row">
@@ -62,22 +63,39 @@
           </div>
         </div>
 
-        <div v-if="sessionState.pending_checkpoint" class="card col">
-          <h3 style="margin: 0">Checkpoint Tier {{ sessionState.pending_checkpoint.tier }}</h3>
-          <p class="muted" style="margin: 0">{{ sessionState.pending_checkpoint.quiz.instructions }}</p>
-
-          <div v-for="(question, qIdx) in sessionState.pending_checkpoint.quiz.questions" :key="qIdx" class="checkpoint-question">
-            <strong>{{ qIdx + 1 }}. {{ question.question }}</strong>
-            <label v-for="(choice, cIdx) in question.choices" :key="cIdx" class="row" style="align-items: center;">
-              <input type="radio" :name="`q_${qIdx}`" :value="cIdx" v-model.number="checkpointAnswers[qIdx]" />
-              <span>{{ choice }}</span>
-            </label>
+        <div class="card col" v-if="sessionState.session.suggested_prompts?.length && !isSessionCompleted">
+          <strong>Suggested Next Inputs</strong>
+          <p class="muted" style="margin: 0;">These are generated from your current direction. Tap one to continue.</p>
+          <div class="row">
+            <button
+              v-for="(prompt, idx) in sessionState.session.suggested_prompts"
+              :key="`suggest-${idx}-${prompt}`"
+              class="ghost prompt-chip"
+              type="button"
+              @click="sendQuickPrompt(prompt)"
+              :disabled="sendingMessage"
+            >
+              {{ prompt }}
+            </button>
           </div>
-
-          <button @click="submitCheckpoint" :disabled="submittingCheckpoint">{{ submittingCheckpoint ? 'Submitting...' : 'Submit Checkpoint' }}</button>
         </div>
 
-        <div class="row" style="align-items: flex-end;">
+        <div class="card col checkpoint-banner" v-if="sessionState.pending_checkpoint">
+          <strong>Checkpoint Ready: Tier {{ sessionState.pending_checkpoint.tier }}</strong>
+          <p class="muted" style="margin: 0;">Quick quiz generated from your conversation. Completing it unlocks reward points.</p>
+          <div class="row">
+            <button @click="openCheckpointModal">Take Quiz</button>
+            <button class="ghost" @click="isCheckpointModalOpen = false">Later</button>
+          </div>
+        </div>
+
+        <div class="card" v-if="isSessionCompleted">
+          <strong>Session Completed</strong>
+          <div class="muted">{{ sessionState.session.completion_reason || 'Token limit reached for this thread.' }}</div>
+          <div class="muted">Start a new session to continue learning deeper.</div>
+        </div>
+
+        <div class="row" style="align-items: flex-end;" v-if="!isSessionCompleted">
           <textarea v-model="draftMessage" rows="3" placeholder="Ask the tutor anything about this topic..."></textarea>
           <button @click="sendMessage" :disabled="sendingMessage">{{ sendingMessage ? 'Sending...' : 'Send' }}</button>
         </div>
@@ -94,11 +112,31 @@
         <p class="muted">Pick a topic from the left to begin your guided study conversation.</p>
       </template>
     </article>
+
+    <div v-if="isCheckpointModalOpen && sessionState?.pending_checkpoint" class="checkpoint-modal-backdrop">
+      <div class="checkpoint-modal panel col">
+        <div class="row" style="justify-content: space-between; align-items: center;">
+          <h3 style="margin: 0">Checkpoint Tier {{ sessionState.pending_checkpoint.tier }}</h3>
+          <button class="ghost" @click="isCheckpointModalOpen = false">Close</button>
+        </div>
+        <p class="muted" style="margin: 0">{{ sessionState.pending_checkpoint.quiz.instructions }}</p>
+
+        <div v-for="(question, qIdx) in sessionState.pending_checkpoint.quiz.questions" :key="qIdx" class="checkpoint-question">
+          <strong>{{ qIdx + 1 }}. {{ question.question }}</strong>
+          <label v-for="(choice, cIdx) in question.choices" :key="cIdx" class="row" style="align-items: center;">
+            <input type="radio" :name="`q_${qIdx}`" :value="cIdx" v-model.number="checkpointAnswers[qIdx]" />
+            <span>{{ choice }}</span>
+          </label>
+        </div>
+
+        <button @click="submitCheckpoint" :disabled="submittingCheckpoint">{{ submittingCheckpoint ? 'Submitting...' : 'Submit Checkpoint' }}</button>
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import { api } from '@/services/api';
 import { renderAssistantMarkdown } from '@/utils/markdown';
@@ -108,6 +146,9 @@ const router = useRouter();
 
 const topics = ref<any[]>([]);
 const sessionState = ref<any | null>(null);
+const chatWindowRef = ref<HTMLElement | null>(null);
+const isCheckpointModalOpen = ref(false);
+const lastPendingCheckpointId = ref<number>(0);
 
 const draftMessage = ref('');
 const sendingMessage = ref(false);
@@ -121,6 +162,7 @@ const submittingCheckpoint = ref(false);
 const lastCheckpointResult = ref<any | null>(null);
 
 const error = ref('');
+const isSessionCompleted = computed(() => sessionState.value?.session?.status === 'completed');
 
 onMounted(async () => {
   await loadTopics();
@@ -131,6 +173,26 @@ watch(
   () => route.params.id,
   async () => {
     await maybeLoadSessionFromRoute();
+  }
+);
+
+watch(
+  () => sessionState.value?.messages?.length,
+  async () => {
+    await nextTick();
+    enhanceCodeBlocks();
+  }
+);
+
+watch(
+  () => sessionState.value?.pending_checkpoint?.id,
+  (id) => {
+    const pendingId = Number(id || 0);
+    if (pendingId > 0 && pendingId !== lastPendingCheckpointId.value) {
+      lastPendingCheckpointId.value = pendingId;
+      isCheckpointModalOpen.value = true;
+      checkpointAnswers.value = [];
+    }
   }
 );
 
@@ -156,6 +218,8 @@ async function loadSession(sessionId: number) {
     const data = await api.get<any>(`/learn/sessions/${sessionId}`);
     sessionState.value = data;
     checkpointAnswers.value = [];
+    await nextTick();
+    enhanceCodeBlocks();
   } catch (e: any) {
     error.value = e?.message || 'Failed to load session';
   }
@@ -246,6 +310,7 @@ async function submitCheckpoint() {
     };
     sessionState.value = data.state;
     checkpointAnswers.value = [];
+    isCheckpointModalOpen.value = false;
   } catch (e: any) {
     error.value = e?.message || 'Failed to submit checkpoint';
   } finally {
@@ -255,6 +320,62 @@ async function submitCheckpoint() {
 
 function formatAssistant(content: string) {
   return renderAssistantMarkdown(content);
+}
+
+function openCheckpointModal() {
+  if (sessionState.value?.pending_checkpoint) {
+    isCheckpointModalOpen.value = true;
+  }
+}
+
+function enhanceCodeBlocks() {
+  const root = chatWindowRef.value;
+  if (!root) {
+    return;
+  }
+
+  const pres = root.querySelectorAll('.assistant-markdown pre');
+  pres.forEach((pre) => {
+    if (pre.getAttribute('data-copy-enhanced') === '1') {
+      return;
+    }
+    pre.setAttribute('data-copy-enhanced', '1');
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'code-copy-btn';
+    button.textContent = 'Copy code';
+    button.addEventListener('click', async () => {
+      const codeEl = pre.querySelector('code');
+      const text = codeEl?.textContent || pre.textContent || '';
+      if (!text.trim()) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = 'Copied';
+      } catch {
+        fallbackCopyText(text);
+        button.textContent = 'Copied';
+      }
+      window.setTimeout(() => {
+        button.textContent = 'Copy code';
+      }, 1200);
+    });
+    pre.appendChild(button);
+  });
+}
+
+function fallbackCopyText(text: string) {
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.style.position = 'fixed';
+  el.style.opacity = '0';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  document.execCommand('copy');
+  document.body.removeChild(el);
 }
 </script>
 
@@ -319,8 +440,10 @@ function formatAssistant(content: string) {
   border: 1px solid rgba(142, 166, 203, 0.25);
   border-radius: 8px;
   padding: 10px;
+  padding-top: 38px;
   overflow: auto;
   margin: 8px 0 10px;
+  position: relative;
 }
 
 .assistant-markdown :deep(pre code) {
@@ -349,5 +472,34 @@ function formatAssistant(content: string) {
 .prompt-chip {
   text-align: left;
   white-space: normal;
+}
+
+.assistant-markdown :deep(.code-copy-btn) {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: 1px solid rgba(142, 166, 203, 0.35);
+  background: rgba(8, 21, 42, 0.92);
+  color: #d9e8ff;
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.checkpoint-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 8, 20, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+  padding: 16px;
+}
+
+.checkpoint-modal {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
 }
 </style>

@@ -38,6 +38,7 @@ BattleVue is a Vue 3 + Vite + TypeScript PWA with a PHP + MySQL backend for dete
       0003_oauth_accounts.sql
       0004_learning_quests.sql
       0005_learning_starter_prompts.sql
+      0006_learning_guidance_and_completion.sql
     scripts/
       migrate.php
       seed.php
@@ -68,7 +69,9 @@ BattleVue is a Vue 3 + Vite + TypeScript PWA with a PHP + MySQL backend for dete
 - Users pick built-in topics (WordPress, MySQL/phpMyAdmin, PostgreSQL/phpPgAdmin, Vue, Vite/npm, PHP, cPanel ops) or create custom topics.
 - Each topic exposes quick guided starter prompts so beginners can start with one tap.
 - Tutor conversations run as long-lived threads in `learning_sessions`.
+- A guidance loop continuously generates suggested next user inputs based on thread direction.
 - Checkpoints are triggered by cumulative learner token milestones.
+- Checkpoint quizzes appear as quick popups and can continue until the session token cap is reached.
 - Passing checkpoints grants `bot_points` to support bot progression.
 
 Set these keys in `backend/config/config.php`:
@@ -81,6 +84,7 @@ Set these keys in `backend/config/config.php`:
 - `LEARN_CHECKPOINT_PASS_PERCENT`
 - `LEARN_POINTS_BASE`
 - `LEARN_POINTS_STEP`
+- `LEARN_SESSION_MAX_TOTAL_TOKENS`
 
 ## Local Setup
 

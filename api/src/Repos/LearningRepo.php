@@ -65,11 +65,24 @@ class LearningRepo
 
     public function createSession(int $userId, int $topicId): int
     {
+        $topic = $this->findTopicByIdForUser($topicId, $userId);
+        $starterPrompts = [];
+        if ($topic && !empty($topic['starter_prompts_json'])) {
+            $decoded = json_decode((string) $topic['starter_prompts_json'], true);
+            if (is_array($decoded)) {
+                $starterPrompts = array_values(array_filter(array_map(static fn($p) => trim((string) $p), $decoded), static fn($p) => $p !== ''));
+            }
+        }
+
         $stmt = $this->db->prepare(
-            'INSERT INTO learning_sessions (user_id, topic_id, status, last_activity_at)
-             VALUES (:user_id, :topic_id, "active", NOW())'
+            'INSERT INTO learning_sessions (user_id, topic_id, status, suggested_prompts_json, last_activity_at)
+             VALUES (:user_id, :topic_id, "active", :suggested_prompts_json, NOW())'
         );
-        $stmt->execute([':user_id' => $userId, ':topic_id' => $topicId]);
+        $stmt->execute([
+            ':user_id' => $userId,
+            ':topic_id' => $topicId,
+            ':suggested_prompts_json' => json_encode(array_slice($starterPrompts, 0, 6), JSON_UNESCAPED_SLASHES),
+        ]);
         return (int) $this->db->lastInsertId();
     }
 
@@ -154,6 +167,37 @@ class LearningRepo
             ':user_tokens' => $userTokens,
             ':model_tokens' => $modelTokens,
             ':total_tokens' => $totalTokens,
+        ]);
+    }
+
+    public function updateSuggestedPrompts(int $sessionId, array $prompts): void
+    {
+        $clean = array_values(array_filter(array_map(static fn($p) => trim((string) $p), $prompts), static fn($p) => $p !== ''));
+        $stmt = $this->db->prepare(
+            'UPDATE learning_sessions
+             SET suggested_prompts_json = :suggested_prompts_json,
+                 updated_at = NOW()
+             WHERE id = :session_id'
+        );
+        $stmt->execute([
+            ':session_id' => $sessionId,
+            ':suggested_prompts_json' => json_encode(array_slice($clean, 0, 6), JSON_UNESCAPED_SLASHES),
+        ]);
+    }
+
+    public function completeSession(int $sessionId, string $reason): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE learning_sessions
+             SET status = "completed",
+                 completion_reason = :reason,
+                 completed_at = NOW(),
+                 updated_at = NOW()
+             WHERE id = :session_id'
+        );
+        $stmt->execute([
+            ':session_id' => $sessionId,
+            ':reason' => mb_substr($reason, 0, 160),
         ]);
     }
 

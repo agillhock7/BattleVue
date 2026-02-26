@@ -112,6 +112,49 @@ class AiTutorService
         return $this->fallbackQuiz($topicTitle, $tier);
     }
 
+    public function generateSuggestedPrompts(string $topicTitle, string $systemPrompt, array $conversation): array
+    {
+        if (!$this->isConfigured()) {
+            return $this->fallbackSuggestedPrompts($topicTitle);
+        }
+
+        $transcript = [];
+        foreach ($conversation as $entry) {
+            $role = (string) ($entry['role'] ?? 'user');
+            if (!in_array($role, ['user', 'assistant'], true)) {
+                continue;
+            }
+            $transcript[] = strtoupper($role) . ': ' . trim((string) ($entry['content'] ?? ''));
+        }
+
+        $prompt = "Based on this learning conversation for '{$topicTitle}', produce 3 suggested NEXT USER INPUTS to continue in the learner's current direction.\n"
+            . "Conversation:\n" . implode("\n", array_slice($transcript, -16))
+            . "\n\nReturn STRICT JSON with this shape: {\"suggested_prompts\":[string,string,string]}\n"
+            . "Requirements: each prompt must be concise, practical, and progressively deeper.";
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'system', 'content' => 'You generate guided next prompts for learners. Output must be valid JSON only.'],
+            ['role' => 'user', 'content' => $prompt],
+        ];
+
+        try {
+            $response = $this->chatCompletions($messages, 0.5, 250, ['type' => 'json_object']);
+            $raw = trim((string) ($response['choices'][0]['message']['content'] ?? ''));
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded) && is_array($decoded['suggested_prompts'] ?? null)) {
+                $clean = array_values(array_filter(array_map(static fn($p) => trim((string) $p), $decoded['suggested_prompts']), static fn($p) => $p !== ''));
+                if (count($clean) > 0) {
+                    return array_slice($clean, 0, 6);
+                }
+            }
+        } catch (Throwable $e) {
+            // Fall through to fallback.
+        }
+
+        return $this->fallbackSuggestedPrompts($topicTitle);
+    }
+
     private function chatCompletions(array $messages, float $temperature, int $maxTokens, ?array $responseFormat): array
     {
         $apiKey = (string) Config::get('OPENAI_API_KEY', '');
@@ -216,6 +259,15 @@ class AiTutorService
                     'explanation' => 'Checkpoints are for gap detection and reinforcement.',
                 ],
             ],
+        ];
+    }
+
+    private function fallbackSuggestedPrompts(string $topicTitle): array
+    {
+        return [
+            'Can you break this down into simpler steps for a beginner in ' . $topicTitle . '?',
+            'Give me a practical mini exercise I can do next.',
+            'What is the most common mistake here and how do I avoid it?',
         ];
     }
 
